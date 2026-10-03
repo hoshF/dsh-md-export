@@ -19,7 +19,10 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
-## [Unreleased]
+## [1.3.1]
+
+An audit pass over the repository rather than a feature change: dead code,
+hardcoded values, and traces of the machine it was developed on.
 
 ### Fixed
 
@@ -28,22 +31,9 @@ downstream tooling may parse it.
   produced a plugin that was present and completely inert — the script warned
   about the missing registration instead of performing it. It now reconciles the
   list the way `dsh plugin` and the app's Plugins page do, and is idempotent.
-  This went unnoticed because the development profile already had the
+  This went unnoticed because the development profile already carried the
   registration from an earlier manual install; the from-scratch path was never
   exercised.
-
-### Added
-
-- README: how to update and uninstall, and a note that a git install resolves to
-  a commit, so updating means installing again.
-
-## [1.3.1]
-
-Housekeeping pass over dead code, hardcoded values, and the repository's own
-environment leakage.
-
-### Fixed
-
 - **`collectLinks` used a 400-character proximity window** to guess whether a
   bare URL was already part of a `[label](url)` link. Long labels and several
   links in one paragraph were misjudged, so a URL could be counted twice or
@@ -61,10 +51,17 @@ environment leakage.
   why it mirrors the host.
 - Both sides of the duplicated route path point at each other, since a browser
   module cannot import host ESM and a change has to be made in two places.
-- Removed the unused `writeSessionHome` fixture helper.
+- `package.json` carries the repository metadata, and the READMEs name the
+  project's real URL.
+
+### Added
+
+- README: how to update and uninstall, and a note that a git install resolves to
+  a commit, so updating means installing again.
 
 ### Removed
 
+- The unused `writeSessionHome` fixture helper.
 - Real session identifiers, workspace paths, port numbers and conversation
   titles that had leaked into the READMEs, the changelog and the tests from the
   machine this was developed on. Every example is synthetic now.
