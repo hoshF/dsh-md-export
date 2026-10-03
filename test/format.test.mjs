@@ -1,33 +1,98 @@
-import { stripHashes, normalizeRefUrl, formatRefLine } from '/Users/hoshf/Project/dsh-md-export/src/render.js';
+/**
+ * Unit tests for the pure formatting helpers.
+ * No filesystem, no DSH — these run anywhere.
+ */
 
-console.log('=== stripHashes：围栏感知 + 吸收内部加粗 ===');
-const sample = [
-  '# 一级标题',
-  '## 2. **带粗体** 的二级标题',
-  '正文里的 # 不是标题',
-  '',
-  '```sh',
-  '# 这是 shell 注释，必须原样保留',
-  'echo "# hi"',
-  '```',
-  '',
-  '~~~python',
-  '# 波浪围栏内也保留',
-  '~~~',
-  '',
-  '#### 四级标题',
-].join('\n');
-console.log(stripHashes(sample));
+import test from 'node:test';
+import assert from 'node:assert/strict';
 
-console.log('\n=== normalizeRefUrl：去 hash / tracking / 尾斜杠 ===');
-for (const u of [
-  'https://a.com/x/?utm_source=tw&id=1#frag',
-  'https://a.com/x/',
-  'https://a.com/',
-  'not a url###',
-]) console.log(`  ${u}\n    → ${normalizeRefUrl(u)}`);
+import {
+  stripHashes, normalizeRefUrl, formatRefLine, formatLocalTime, markdownFilename,
+} from '../src/render.js';
 
-console.log('\n=== formatRefLine ===');
-console.log('  ' + formatRefLine(1, 'Real Title', 'https://a.com/x'));
-console.log('  ' + formatRefLine(2, '', 'https://a.com/y'));
-console.log('  ' + formatRefLine(3, 'https://a.com/z', 'https://a.com/z'));
+test('stripHashes demotes headings to bold', () => {
+  assert.equal(stripHashes('# Title'), '**Title**');
+  assert.equal(stripHashes('###### Six'), '**Six**');
+  assert.equal(stripHashes('#### 四级标题'), '**四级标题**');
+});
+
+test('stripHashes absorbs existing emphasis into one bold span', () => {
+  assert.equal(stripHashes('## **Already bold**'), '**Already bold**');
+  assert.equal(stripHashes('## a **b** c'), '**a b c**');
+});
+
+test('stripHashes leaves non-headings alone', () => {
+  assert.equal(stripHashes('not a # heading'), 'not a # heading');
+  assert.equal(stripHashes('正文里的井号 # 不算标题。'), '正文里的井号 # 不算标题。');
+  assert.equal(stripHashes('#nospace'), '#nospace');
+  assert.equal(stripHashes('#'), '#');
+  assert.equal(stripHashes(''), '');
+  assert.equal(stripHashes(null), '');
+  assert.equal(stripHashes(undefined), '');
+});
+
+test('stripHashes preserves fenced code byte for byte', () => {
+  const backtick = ['```sh', '# comment', 'echo "# hi"', '```', '# heading after fence'].join('\n');
+  assert.equal(
+    stripHashes(backtick),
+    ['```sh', '# comment', 'echo "# hi"', '```', '**heading after fence**'].join('\n'),
+  );
+
+  const tilde = ['~~~python', '# comment', '~~~'].join('\n');
+  assert.equal(stripHashes(tilde), tilde);
+
+  // a fence only closes on the same character
+  const mixed = ['```', '~~~', '# still inside', '```', '# outside'].join('\n');
+  assert.equal(stripHashes(mixed), ['```', '~~~', '# still inside', '```', '**outside**'].join('\n'));
+});
+
+test('normalizeRefUrl strips fragments, attribution parameters and trailing slashes', () => {
+  assert.equal(
+    normalizeRefUrl('https://a.com/x/?utm_source=tw&utm_campaign=c&id=1#frag'),
+    'https://a.com/x/?id=1',
+  );
+  assert.equal(normalizeRefUrl('https://a.com/x/'), 'https://a.com/x');
+  assert.equal(normalizeRefUrl('https://a.com/'), 'https://a.com');
+  assert.equal(normalizeRefUrl('https://a.com/x?fbclid=abc'), 'https://a.com/x');
+  assert.equal(normalizeRefUrl('https://a.com/x?spm=a1.spm&keep=1'), 'https://a.com/x?keep=1');
+});
+
+test('normalizeRefUrl degrades gracefully on unusable input', () => {
+  assert.equal(normalizeRefUrl(''), '');
+  assert.equal(normalizeRefUrl('   '), '');
+  assert.equal(normalizeRefUrl(null), '');
+  assert.equal(normalizeRefUrl('not a url###'), 'not a url');
+});
+
+test('formatRefLine degrades sensibly', () => {
+  assert.equal(formatRefLine(1, 'Title', 'https://a.com/x'), '- [1] [Title](https://a.com/x)');
+  assert.equal(formatRefLine(2, '', 'https://a.com/y'), '- [2] [https://a.com/y](https://a.com/y)');
+  assert.equal(formatRefLine(3, 'https://a.com/z', 'https://a.com/z'), '- [3] [https://a.com/z](https://a.com/z)');
+});
+
+test('formatLocalTime is stable and carries a timezone offset', () => {
+  assert.equal(formatLocalTime(null), 'unknown');
+  assert.equal(formatLocalTime(0), 'unknown');
+  assert.equal(formatLocalTime(Number.NaN), 'unknown');
+  assert.match(formatLocalTime(1790000000000), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}$/);
+});
+
+test('markdownFilename prefers the conversation title', () => {
+  const header = { id: 'session-abc12345' };
+  assert.equal(markdownFilename(header, '不拆书高质量扫描设备'), '不拆书高质量扫描设备.md');
+  assert.equal(markdownFilename(header, 'Plain title'), 'Plain title.md');
+});
+
+test('markdownFilename sanitises illegal characters and length', () => {
+  const header = { id: 'session-abc12345' };
+  assert.equal(markdownFilename(header, 'a/b:c*d?e"f<g>h|i'), 'a b c d e f g h i.md');
+  assert.equal(markdownFilename(header, 'trailing dots...'), 'trailing dots.md');
+  assert.equal(markdownFilename(header, 'x'.repeat(120)), `${'x'.repeat(80)}.md`);
+});
+
+test('markdownFilename falls back to a short id', () => {
+  const header = { id: 'session-abc12345' };
+  assert.equal(markdownFilename(header, null), 'dsh-abc12345.md');
+  assert.equal(markdownFilename(header, ''), 'dsh-abc12345.md');
+  assert.equal(markdownFilename(header, '   '), 'dsh-abc12345.md');
+});
