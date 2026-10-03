@@ -1,0 +1,75 @@
+name: Bug report
+description: The export failed, produced the wrong thing, or the button is missing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Three answers decide almost every diagnosis here: the **DSH version**, the
+        **session format version**, and **how** it failed. Those three are
+        different bugs, so please fill them in.
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH version
+      description: >
+        The app version, not the CLI. In the desktop app it is in Settings →
+        About; `dsh -V` reports the *CLI* install, which may be a different
+        version entirely.
+      placeholder: '0.2.0-rc.2'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: session-format
+    attributes:
+      label: Session format version
+      description: >
+        The filename in `$DSH_HOME/sessions/<project>/<session-id>/`.
+        `session.jsonl.zstd` means v0; `session.v3.jsonl.zstd` means v3.
+      options:
+        - v4 (session.v4.jsonl.zstd)
+        - v3 (session.v3.jsonl.zstd)
+        - v0–v2 (session.jsonl.zstd)
+        - unknown / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: failure-mode
+    attributes:
+      label: How did it fail?
+      options:
+        - The saved file contains only the header — no messages
+        - The route returned HTTP 500
+        - The "导出 MD" button is missing from the session header
+        - The save dialog never appeared (file went to Downloads instead)
+        - The saved file has the wrong name
+        - The Markdown structure is wrong (headings, references, metadata)
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: smoke
+    attributes:
+      label: Output of the smoke test
+      description: 'Run `npm run test:smoke` and paste the result. Redact anything private.'
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        > **Privacy:** do not paste session contents into this issue. Exports
+        contain your conversations. The smoke-test output above is enough to
+        diagnose most problems.

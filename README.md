@@ -1,11 +1,21 @@
 # dsh-md-export
 
-English | [中文](README.zh.md)
+English | [中文](README.zh.md) · [Format contract](docs/FORMAT.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
+[![CI](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml)
 
 An **"导出 MD" button in the DSH Web session header** that exports the current
 conversation as clean Markdown through a **native save dialog**. It ships as a
 self-contained dual-face DSH plugin (host route + client module) plus a CLI that
 shares the exact same rendering core.
+
+<!-- Demo assets belong here — they are the single most useful thing in this
+     file. Record ~5 seconds of: click the button → OS save dialog → file
+     appears. Save it as docs/demo.gif and uncomment:
+
+![Click the button, get a save dialog, get the Markdown](docs/demo.gif)
+
+-->
 
 ```markdown
 ## Metadata
@@ -49,13 +59,35 @@ between format versions.
 
 ## Requirements
 
-- DSH 0.2.x (desktop app or a `web` profile). Built and verified against
-  **0.2.0-rc.2**.
+- DSH 0.2.x (desktop app or a `web` profile).
 - Node.js 20+ — the runtime DSH already bundles is fine.
 - A profile the CLI may manage. Note that the Electron-owned `desktop` profile is
   rejected by `dsh plugin`, which is why `install.sh` drives pnpm directly.
 
+### Support matrix
+
+| | supported |
+|---|---|
+| DSH | **0.2.0-rc.2** — built and verified against it. Earlier 0.2 prereleases should work; 0.1.x will not (the plugin gate rejects the peer range this would imply, and the session format differs). |
+| Session format | **v3 and v4**. v0–v2 use a chunk-row layout with no equivalent of today's message bodies: the export runs, warns, and comes out incomplete. |
+| Platforms | Anywhere DSH runs. `install.sh` is POSIX `sh`; nothing is macOS-specific. |
+| Host | Desktop app and `web` profile. The route is a normal `ctx.webServer` registration. |
+
+Compatibility is a moving target: DSH is on a prerelease train and this plugin
+reads an internal format. [`docs/FORMAT.md`](docs/FORMAT.md) states exactly what
+is depended on, so a break can be diagnosed rather than guessed at.
+
 ## Install
+
+Two ways in — the first needs no terminal.
+
+**From the app.** Open **Plugins** in the sidebar → **Add plugin** → paste this
+repository's URL → restart DSH. The plugin manager accepts a GitHub address
+directly. This works because the package has **no build step**: pnpm blocks
+`prepare` scripts for git-hosted dependencies, so a package that needed building
+could not be installed this way.
+
+**From a checkout.**
 
 ```sh
 git clone <this repo> && cd dsh-md-export
@@ -153,21 +185,32 @@ both return 403. The Markdown never leaves the machine.
 | Path | Purpose |
 |---|---|
 | `src/session.js` | Session enumeration and lookup (highest generation wins), multi-frame zstd decompression |
-| `src/render.js` | Event stream → spec-compliant Markdown (`stripHashes`, reference collector) |
+| `src/render.js` | Event stream → Markdown (`stripHashes`, reference collector) |
 | `src/index.js` | Cordis host plugin: registers `GET /api/md-export` |
 | `lib/client.js` | Client module: session-header button and save dialog |
 | `bin/dsh-md-export.mjs` | CLI over the same core |
 | `cordis.patch.yml` | Bundle patch that inserts the host plugin row |
+| `docs/FORMAT.md` | The session-log format contract we depend on |
+| `test/fixtures.mjs` | Synthetic session logs, including a deliberate multi-frame layout |
+| `test/render.test.mjs` | Event stream → Markdown behaviour |
 | `test/host.test.mjs` | Route tests, including trust-fence cases |
-| `test/format.test.mjs` | Format helpers (`stripHashes`, `normalizeRefUrl`, `formatRefLine`) |
+| `test/format.test.mjs` | Pure formatting helpers |
+| `test/smoke-real-session.mjs` | Manual check against a real session |
 
-## Testing
+## Development
+
+The package has **zero dependencies and no build step**, so there is nothing to
+install:
 
 ```sh
-NODE=$(command -v node)
-$NODE test/host.test.mjs <sessionId>   # routes + trust fence
-$NODE test/format.test.mjs             # format helpers
+npm test                        # hermetic suite — no DSH, no session data
+npm run test:smoke              # against the newest real session
+node test/smoke-real-session.mjs <sessionId>
 ```
+
+CI runs `npm test` on Node 20, 22 and 24. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for the two hard constraints (no build step, clean-room implementation) before
+sending a patch.
 
 ## Known constraints
 
@@ -180,6 +223,33 @@ $NODE test/format.test.mjs             # format helpers
   actively streaming yields everything up to the most recent flush.
 - **A live session's title may lag.** The prefetched filename reflects the title
   at mount time.
+- **This reads an undocumented internal format.** [`docs/FORMAT.md`](docs/FORMAT.md)
+  is the contract, and it is the thing most likely to break.
+
+## Status and scope
+
+This is a **gap-filler**. It exists because DSH has no built-in Markdown export —
+the official `@deepseek-ai/dsh-session-log-export` produces a ZIP of JSONL events
+for debugging, which is a different product, not a missing feature.
+
+If DSH ships a native readable export, this project should be retired, or
+reduced to the CLI. That is not a hypothetical to be defensive about; it is the
+intended outcome, and it is why the interface is documented rather than clever.
+
+## Acknowledgements
+
+The document format — `## Metadata`, emoji role headings, `### References`,
+title-based filenames — follows the convention popularised by
+[AfterChat — LLM Chat Exporter](https://github.com/AfterThink) and comparable
+chat exporters. Formats are shared freely; this repository's implementation is
+its own (see [CONTRIBUTING.md](CONTRIBUTING.md#hard-constraint-2-clean-room),
+which explains why that distinction is load-bearing here).
+
+Thanks also to the DSH plugin authors whose failures and successes made the
+compatibility landscape legible: the error messages in
+`dsh-session-export`, `dsh-conversation-exporter` and
+`@240xu/dsh-message-ops` are what identified the version gate, the format
+rewrite, and the multi-frame zstd layout respectively.
 
 ## License
 

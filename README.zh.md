@@ -1,10 +1,20 @@
 # dsh-md-export
 
-[English](README.md) | 中文
+[English](README.md) | 中文 · [格式契约](docs/FORMAT.md) · [贡献指南](CONTRIBUTING.md) · [变更日志](CHANGELOG.md)
+
+[![CI](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml)
 
 DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出**系统原生保存窗口**，
 把当前会话导出为干净可读的 Markdown。它以自包含的**双面插件**形式交付（宿主路由 +
 客户端模块），另附一个与界面按钮**共用同一渲染核心**的命令行工具。
+
+<!-- 演示素材的位置在这里——它是整个 README 里最有说服力的一项。
+     录约 5 秒：点按钮 → 弹出系统保存框 → 文件落盘。
+     存成 docs/demo.gif 后取消下面的注释：
+
+![点按钮，弹保存框，得到 Markdown](docs/demo.gif)
+
+-->
 
 ```markdown
 ## Metadata
@@ -47,12 +57,32 @@ DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出*
 
 ## 环境要求
 
-- DSH 0.2.x（桌面 App 或 `web` profile）。构建与验证基于 **0.2.0-rc.2**。
+- DSH 0.2.x（桌面 App 或 `web` profile）。
 - Node.js 20+ —— DSH 自带的运行时即可。
 - 一个 CLI 可管理的 profile。注意 Electron 独占的 `desktop` profile 会被
   `dsh plugin` 拒绝，所以 `install.sh` 直接驱动 pnpm。
 
+### 支持矩阵
+
+| | 支持情况 |
+|---|---|
+| DSH | **0.2.0-rc.2** —— 构建与验证基于它。更早的 0.2 预发布版应该可用；0.1.x 不行（那意味着另一套 peer 范围，会被插件闸门拒绝，且会话格式不同）。 |
+| 会话格式 | **v3 与 v4**。v0–v2 是 chunk 行布局，没有今天这种消息体：导出会执行、给出警告，但内容不完整。 |
+| 平台 | 任何能跑 DSH 的地方。`install.sh` 是 POSIX `sh`，没有 macOS 专属逻辑。 |
+| 宿主 | 桌面 App 与 `web` profile 均可。路由就是一次普通的 `ctx.webServer` 注册。 |
+
+兼容性是个移动靶：DSH 在预发布列车上，而本插件读的是内部格式。
+[`docs/FORMAT.md`](docs/FORMAT.md) 明确写清了我们依赖什么，因此出问题时是**可诊断**而不是靠猜。
+
 ## 安装
+
+两条路，第一条不需要终端。
+
+**在 App 里装。** 侧边栏打开 **插件** → **添加插件** → 粘贴本仓库地址 → 重启 DSH。
+插件管理器直接接受 GitHub 地址。这条路能走通，是因为本包**没有构建步骤**：
+pnpm 会拦截 git 托管依赖的 `prepare` 脚本，所以任何需要构建的包都无法这样安装。
+
+**从源码装。**
 
 ```sh
 git clone <本仓库> && cd dsh-md-export
@@ -139,21 +169,30 @@ RFC 5987 的 `filename*`）以及供客户端读取真实文件名的 `X-Dsh-Fil
 | 路径 | 作用 |
 |---|---|
 | `src/session.js` | 会话枚举与定位（同目录多代取最高代）、多帧 zstd 解压 |
-| `src/render.js` | 事件流 → 规范格式 Markdown（`stripHashes`、引用收集器） |
+| `src/render.js` | 事件流 → Markdown（`stripHashes`、引用收集器） |
 | `src/index.js` | Cordis 宿主插件：注册 `GET /api/md-export` |
 | `lib/client.js` | 客户端模块：会话标题栏按钮与保存框 |
 | `bin/dsh-md-export.mjs` | 共用同一核心的命令行工具 |
 | `cordis.patch.yml` | 插入宿主插件行的 bundle patch |
+| `docs/FORMAT.md` | 我们依赖的会话日志格式契约 |
+| `test/fixtures.mjs` | 合成会话日志，含刻意构造的多帧布局 |
+| `test/render.test.mjs` | 事件流 → Markdown 的行为测试 |
 | `test/host.test.mjs` | 路由测试，含信任围栏用例 |
-| `test/format.test.mjs` | 格式工具单测（`stripHashes` / `normalizeRefUrl` / `formatRefLine`） |
+| `test/format.test.mjs` | 纯格式工具单测 |
+| `test/smoke-real-session.mjs` | 针对真实会话的手动冒烟 |
 
-## 测试
+## 开发
+
+本包**零依赖、无构建步骤**，因此没有任何东西需要安装：
 
 ```sh
-NODE=$(command -v node)
-$NODE test/host.test.mjs <sessionId>   # 路由 + 信任围栏
-$NODE test/format.test.mjs             # 格式工具
+npm test                        # 密闭测试套件——不需要 DSH，不碰任何会话数据
+npm run test:smoke              # 针对最近一次真实会话
+node test/smoke-real-session.mjs <会话ID>
 ```
+
+CI 在 Node 20 / 22 / 24 上跑 `npm test`。提 PR 之前请先看
+[CONTRIBUTING.md](CONTRIBUTING.md) 里的两条硬约束（无构建步骤、清洁室实现）。
 
 ## 已知约束
 
@@ -163,6 +202,30 @@ $NODE test/format.test.mjs             # 格式工具
 - **直接读文件，不先 flush。** 导出正在流式写入的会话，得到的是最近一次 flush 之前的
   全部内容。
 - **活跃会话的标题可能滞后。** 预取到的文件名反映的是组件挂载时的标题。
+- **读的是未公开的内部格式。** [`docs/FORMAT.md`](docs/FORMAT.md) 就是那份契约，也是
+  最可能先坏掉的地方。
+
+## 定位与边界
+
+这是一个**补位项目**。它存在，是因为 DSH 没有内置的 Markdown 导出——官方那个
+`@deepseek-ai/dsh-session-log-export` 产出的是用于调试的 JSONL 事件 ZIP，
+那是另一个产品，不是缺了一半的功能。
+
+如果 DSH 将来提供了原生可读导出，**这个项目就应该退役**，或收缩为命令行工具。
+这不是一句需要自我辩护的假设，而是它本来的预期结局——这也是为什么这里把接口写清楚
+而不是写得聪明。
+
+## 致谢
+
+文档格式——`## Metadata`、emoji 角色标题、`### References`、以标题作文件名——沿用了
+[AfterChat — LLM Chat Exporter](https://github.com/AfterThink) 及同类导出器普及开来的
+约定。格式是共享的；本仓库的实现是自己的（原因见
+[CONTRIBUTING.md](CONTRIBUTING.md#hard-constraint-2-clean-room)——在这个项目里，这条界线
+是承重的）。
+
+同时感谢那些插件作者：正是 `dsh-session-export`、`dsh-conversation-exporter` 和
+`@240xu/dsh-message-ops` 各自的报错，才让这里的兼容性地形变得清晰可辨——它们分别暴露了
+版本闸门、格式重写和多帧 zstd 布局。
 
 ## 许可
 
