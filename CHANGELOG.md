@@ -52,7 +52,7 @@ downstream tooling may parse it.
 
 - **The README claimed things that were not true.** The support matrix listed
   session formats as "v3 and v4", with v0–v2 described as emitting a warning and
-  an incomplete export — no such warning has ever existed, and all four layouts are
+  an incomplete export — no such warning has ever existed, and v0, v3 and v4 are all
   supported (see 1.6.1). It also described the CI matrix as Node 20/22/24 when it
   is 22.15/24/26, and described the filename prefetch as happening at mount when
   the click now refetches it.

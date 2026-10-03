@@ -249,10 +249,15 @@ addition of this plugin; the convention has no equivalent concept.
 | | Supported |
 |---|---|
 | DSH | **0.2.0-rc.2** — built and verified against it. Earlier 0.2 prereleases should work; 0.1.x will not (the plugin gate rejects the peer range this would imply, and the session format differs). |
-| Session format | **v0, v3 and v4** — every layout DSH has written. Row shapes are dispatched individually rather than gated on a version number. |
+| Session format | **v0, v3 and v4** — verified against real logs of each. Row shapes are dispatched individually rather than gated on a version number. |
 | Node runtime | **22.15+**. The `node:zlib` zstd API the log format needs does not exist in 20 or 21. Verified on 22.15, 24 and 26. |
 | Host | Desktop app and `web` profile. The route is a normal `ctx.webServer` registration. |
 | Platforms | Anywhere DSH runs. `install.sh` is POSIX `sh`; nothing is macOS-specific. |
+
+Formats v1 and v2 exist in DSH's codec chain but never appeared on the machine
+this was developed against, so they are **not** claimed as tested: they take the
+same shape dispatch as v0 rather than a verified path. If you have such a log and
+something looks wrong, that is a useful issue to open.
 
 Compatibility is a moving target: DSH is on a prerelease train and this plugin
 reads an internal format. [`docs/FORMAT.md`](docs/FORMAT.md) states exactly what
