@@ -4,7 +4,7 @@ English | [中文](README.zh.md) · [Format contract](docs/FORMAT.md) · [Contri
 
 [![CI](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml)
 
-An **"导出 MD" button in the DSH Web session header** that exports the current
+An **Export MD button** in the DSH Web session header that exports the current
 conversation as clean Markdown through a **native save dialog**. It ships as a
 self-contained dual-face DSH plugin (host route + client module) plus a CLI that
 shares the exact same rendering core.
@@ -127,7 +127,8 @@ both the dependency and its bundle registration.
 
 ## Usage
 
-**In the app.** The button sits in the session header's utilities slot. Clicking
+**In the app.** The button sits in the session header's utilities slot. Its label
+follows the app's language setting — `Export MD` in English, `导出 MD` in Chinese. Clicking
 it opens the OS save dialog immediately, then writes the Markdown. The suggested
 filename is the conversation title — e.g. `Refactoring the parser.md`.
 

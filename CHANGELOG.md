@@ -19,6 +19,28 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.4.0]
+
+### Added
+
+- **The UI copy is localised.** The button was hardcoded Chinese, so in an
+  English UI it was the only Chinese string in the session header. It now
+  registers `zh` and `en` dictionaries with the host's locale service and
+  subscribes to `locale/change`, so switching the language in Settings updates it
+  without a reload. The plugin does not decide the language itself — that is the
+  host's precedence chain (explicit user choice, then browser language, then
+  English) — and it deliberately does not read `navigator.language`, which would
+  bypass the user's own setting.
+
+### Changed
+
+- A download glyph precedes the label, and the label is shorter. The icon is
+  inline SVG rather than an emoji, which renders differently on every platform.
+  Icon-only was considered and rejected: the session header already offers the
+  official *Download session log*, which produces a ZIP of JSONL rather than a
+  readable transcript, and an unlabelled arrow cannot be told apart from it.
+- `title` and `aria-label` text follow the language too.
+
 ## [1.3.2]
 
 ### Fixed

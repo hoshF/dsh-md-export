@@ -4,7 +4,8 @@
 
 [![CI](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml)
 
-DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出**系统原生保存窗口**，
+DSH Web 会话标题栏上的一颗 **导出 MD 按钮**（中文界面显示「导出 MD」，英文界面显示 `Export MD`）：
+点击后弹出**系统原生保存窗口**，
 把当前会话导出为干净可读的 Markdown。它以自包含的**双面插件**形式交付（宿主路由 +
 客户端模块），另附一个与界面按钮**共用同一渲染核心**的命令行工具。
 
@@ -117,7 +118,7 @@ git clone https://github.com/hoshF/dsh-md-export.git && cd dsh-md-export
 
 ## 用法
 
-**界面内。** 按钮位于会话标题栏的 utilities 插槽。点击后**立刻弹出系统保存框**，
+**界面内。** 按钮位于会话标题栏的 utilities 插槽，文案跟随 App 的语言设置。点击后**立刻弹出系统保存框**，
 随后写入 Markdown。建议文件名即对话标题，例如 `重构解析器.md`。
 
 **命令行。**
