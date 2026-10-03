@@ -126,7 +126,7 @@ both the dependency and its bundle registration.
 
 **In the app.** The button sits in the session header's utilities slot. Its label
 follows the app's language setting — `Export MD` in English, `导出 MD` in Chinese. A toast then
-names the file that was written. Clicking
+names the file that was written, or carries the reason if it failed. Clicking
 it opens the OS save dialog immediately, then writes the Markdown. The suggested
 filename is the conversation title — e.g. `Refactoring the parser.md`.
 

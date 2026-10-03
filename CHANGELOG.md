@@ -19,6 +19,26 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.6.0]
+
+### Changed
+
+- **The button no longer has a hover tooltip.** Its `title` was the source of a
+  native tooltip that lingered for several seconds after the pointer left — long
+  enough to sit on top of the completion toast for that toast's entire life,
+  which is how it turned up covering the filename in the first demo recording.
+  The explanation it carried is now an `aria-describedby` pointing at a visually
+  hidden node: assistive technology still reads it, nothing floats over the UI.
+  The button's accessible name remains its visible label, so WCAG's Label in Name
+  still holds.
+
+### Added
+
+- **Failures now report through the toast**, with a red alert glyph and a longer
+  hold, instead of only appearing in that tooltip. The previous behaviour put the
+  reason for a failed export behind a hover, which is the worst place for
+  something a user needs to read.
+
 ## [1.5.1]
 
 ### Changed
