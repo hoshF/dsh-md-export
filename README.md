@@ -9,13 +9,10 @@ conversation as clean Markdown through a **native save dialog**. It ships as a
 self-contained dual-face DSH plugin (host route + client module) plus a CLI that
 shares the exact same rendering core.
 
-<!-- Demo assets belong here — they are the single most useful thing in this
-     file. Record ~5 seconds of: click the button → OS save dialog → file
-     appears. Save it as docs/demo.gif and uncomment:
-
 ![Click the button, get a save dialog, get the Markdown](docs/demo.gif)
 
--->
+<!-- Regenerate from a screen recording with ffmpeg. The 1280x640 card in
+     docs/social-preview.png is the one uploaded under Settings → Social preview. -->
 
 ```markdown
 ## Metadata

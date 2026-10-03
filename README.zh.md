@@ -9,13 +9,10 @@ DSH Web 会话标题栏上的一颗 **导出 MD 按钮**（中文界面显示「
 把当前会话导出为干净可读的 Markdown。它以自包含的**双面插件**形式交付（宿主路由 +
 客户端模块），另附一个与界面按钮**共用同一渲染核心**的命令行工具。
 
-<!-- 演示素材的位置在这里——它是整个 README 里最有说服力的一项。
-     录约 5 秒：点按钮 → 弹出系统保存框 → 文件落盘。
-     存成 docs/demo.gif 后取消下面的注释：
-
 ![点按钮，弹保存框，得到 Markdown](docs/demo.gif)
 
--->
+<!-- 用 ffmpeg 从屏幕录制重新生成。docs/social-preview.png 是 1280×640
+     的卡片，用于 Settings → Social preview。 -->
 
 ```markdown
 ## Metadata
