@@ -60,7 +60,9 @@ between format versions.
 ## Requirements
 
 - DSH 0.2.x (desktop app or a `web` profile).
-- Node.js 20+ — the runtime DSH already bundles is fine.
+- Node.js **22.15+** — that is where `node:zlib` gained zstd, and DSH session
+  logs are zstd-compressed. Node 20 and 21 have no zstd support at all, so the
+  plugin cannot read a log there. DSH's bundled runtime qualifies.
 - A profile the CLI may manage. Note that the Electron-owned `desktop` profile is
   rejected by `dsh plugin`, which is why `install.sh` drives pnpm directly.
 
@@ -71,6 +73,7 @@ between format versions.
 | DSH | **0.2.0-rc.2** — built and verified against it. Earlier 0.2 prereleases should work; 0.1.x will not (the plugin gate rejects the peer range this would imply, and the session format differs). |
 | Session format | **v3 and v4**. v0–v2 use a chunk-row layout with no equivalent of today's message bodies: the export runs, warns, and comes out incomplete. |
 | Platforms | Anywhere DSH runs. `install.sh` is POSIX `sh`; nothing is macOS-specific. |
+| Node runtime | **22.15+**. The `node:zlib` zstd API the log format needs does not exist in 20 or 21. Verified on 22.15, 24 and 26. |
 | Host | Desktop app and `web` profile. The route is a normal `ctx.webServer` registration. |
 
 Compatibility is a moving target: DSH is on a prerelease train and this plugin

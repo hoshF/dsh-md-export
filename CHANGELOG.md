@@ -19,6 +19,37 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.3.2]
+
+### Fixed
+
+- **The plugin required a newer Node than it claimed.** `engines` said `>=20` and
+  the README said the same, but reading a session log needs
+  `zstdDecompressSync`, which `node:zlib` only gained in **Node 22.15** (23.8 on
+  the 23 line). On Node 20 the named import made the module fail to *link*, so the
+  plugin did not even load — it surfaced as `does not provide an export named
+  'zstdDecompressSync'`. `engines` now says `>=22.15`, the docs say so, and
+  `src/session.js` imports `node:zlib` as a namespace and checks at runtime so an
+  unsupported runtime gets a sentence instead of a module error. The plugin also
+  warns once at load time in that case.
+
+  CI caught this: the Node 20 matrix leg failed while 22, 24 and 26 passed. The
+  matrix is now `22.15.0` (the real floor), `24` and `26` — testing the claimed
+  minimum is the point.
+- The unsupported-runtime error was being swallowed. `decompressZstdAll()`
+  catches failures while probing for frame boundaries, which also caught "this
+  runtime has no zstd" and replaced it with a misleading
+  `zstd frame boundary parse failed`. The capability check now runs before the
+  loop.
+
+### Changed
+
+- `install.sh` deletes the profile lockfile before installing. pnpm reuses the
+  previously locked tarball when a rebuilt one keeps the same version, so
+  editing the source and re-running the script could report success while
+  changing nothing. A profile locks only this one dependency, so there is no
+  cost to regenerating it.
+
 ## [1.3.1]
 
 An audit pass over the repository rather than a feature change: dead code,

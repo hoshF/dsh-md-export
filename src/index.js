@@ -6,7 +6,7 @@
  * 本插件不声明任何 @deepseek-ai/* peer 依赖，因此不会被 0.2.x 的兼容性闸门拦下。
  */
 
-import { findSessionFile, readSessionLog } from './session.js';
+import { findSessionFile, readSessionLog, hasZstdSupport } from './session.js';
 import { renderMarkdown, markdownFilename, extractModel, fallbackMarkdownFilename } from './render.js';
 
 export const name = 'md-export';
@@ -201,6 +201,15 @@ export function createMdExportHandler({ trustedHosts = [], onError = () => {} } 
  * @param {object} ctx DSH Cordis 上下文。
  */
 export function apply(ctx) {
+  // 会话日志是 zstd 压缩的，而 node:zlib 的 zstd API 在 22.15 之前不存在。
+  // 在这里说清楚，好过让用户点按钮时收到一条 500。
+  if (!hasZstdSupport()) {
+    ctx.logger?.warn?.(new Error(
+      `md-export: this runtime (Node ${process.version}) has no zstd support in node:zlib, `
+      + 'so DSH session logs cannot be read. Node 22.15+ is required.',
+    ));
+  }
+
   const trustedHosts = ctx.webRuntime?.trustedHosts ?? [];
   const handler = createMdExportHandler({
     trustedHosts,

@@ -58,7 +58,9 @@ DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出*
 ## 环境要求
 
 - DSH 0.2.x（桌面 App 或 `web` profile）。
-- Node.js 20+ —— DSH 自带的运行时即可。
+- Node.js **22.15+** —— `node:zlib` 是在这个版本才有 zstd 的，而 DSH 的会话日志
+  是 zstd 压缩的。Node 20 与 21 完全没有 zstd 支持，插件在那上面读不出任何日志。
+  DSH 自带的运行时满足要求。
 - 一个 CLI 可管理的 profile。注意 Electron 独占的 `desktop` profile 会被
   `dsh plugin` 拒绝，所以 `install.sh` 直接驱动 pnpm。
 
@@ -69,6 +71,7 @@ DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出*
 | DSH | **0.2.0-rc.2** —— 构建与验证基于它。更早的 0.2 预发布版应该可用；0.1.x 不行（那意味着另一套 peer 范围，会被插件闸门拒绝，且会话格式不同）。 |
 | 会话格式 | **v3 与 v4**。v0–v2 是 chunk 行布局，没有今天这种消息体：导出会执行、给出警告，但内容不完整。 |
 | 平台 | 任何能跑 DSH 的地方。`install.sh` 是 POSIX `sh`，没有 macOS 专属逻辑。 |
+| Node 运行时 | **22.15+**。日志格式需要的 `node:zlib` zstd API 在 20 与 21 上不存在。已在 22.15 / 24 / 26 上验证。 |
 | 宿主 | 桌面 App 与 `web` profile 均可。路由就是一次普通的 `ctx.webServer` 注册。 |
 
 兼容性是个移动靶：DSH 在预发布列车上，而本插件读的是内部格式。

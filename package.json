@@ -1,6 +1,6 @@
 {
   "name": "dsh-md-export",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "private": true,
   "type": "module",
   "description": "DSH Web session-header button that exports the current conversation as clean Markdown through a native save dialog.",
@@ -30,7 +30,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.15"
   },
   "scripts": {
     "test": "node --test test/format.test.mjs test/render.test.mjs test/host.test.mjs",

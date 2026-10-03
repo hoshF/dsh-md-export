@@ -79,6 +79,13 @@ cd "$PROFILE_DIR"
 # package.json, and a cleaned-up tarball makes that fail with ENOENT, silently
 # aborting the whole `add`.
 run_pnpm remove "$PACKAGE" >/dev/null 2>&1 || true
+
+# Drop the lockfile as well. It records the previous tarball's integrity, and
+# pnpm will reuse that copy when a rebuilt tarball keeps the same version — so a
+# source change would appear to install while changing nothing. A profile locks
+# only this one dependency, so regenerating it costs nothing.
+rm -f "$PROFILE_DIR/pnpm-lock.yaml"
+
 run_pnpm add "file:$TARBALL" >/dev/null
 
 # ------------------------------------------------------------------ register

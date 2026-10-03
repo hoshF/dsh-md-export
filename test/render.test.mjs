@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { readSessionLog } from '../src/session.js';
+import { readSessionLog, hasZstdSupport } from '../src/session.js';
 import { renderMarkdown } from '../src/render.js';
 import { writeSession, TITLE, MODEL } from './fixtures.mjs';
 
@@ -24,6 +24,14 @@ const { file } = writeSession(home);
 const log = readSessionLog(file);
 
 const render = (opts = {}) => renderMarkdown(log, opts, { origin: 'http://127.0.0.1:8080' });
+
+test('the runtime provides the zstd API the log format needs', () => {
+  assert.equal(
+    hasZstdSupport(),
+    true,
+    `node:zlib zstd is required to read session logs (Node 22.15+); running ${process.version}`,
+  );
+});
 
 test('reads every zstd frame, not just the first', () => {
   const { markdown } = render();

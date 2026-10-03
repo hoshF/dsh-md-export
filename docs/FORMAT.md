@@ -39,6 +39,16 @@ extending the boundary when a candidate slice fails to decode.
 
 **Any code that touches these files must go through that function.**
 
+### Node requirement
+
+The zstd API lives in `node:zlib` and only exists from **Node 22.15** (and
+23.8 / 24.0 on those lines). Node 20 and 21 have no zstd support whatsoever, so
+this format cannot be read there at all — which is why `engines` says `>=22.15`
+and why `src/session.js` imports `node:zlib` as a namespace and checks at
+runtime rather than importing `zstdDecompressSync` by name. A named import makes
+the whole module fail to link on an unsupported runtime, turning "this build
+cannot read logs" into an inscrutable `does not provide an export named …`.
+
 ## The event shapes we depend on
 
 After the header line (`{"type":"session","version":N,"id":…,"cwd":…}`), each

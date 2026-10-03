@@ -4,16 +4,39 @@
  * DSH 往会话日志里按帧追加 zstd 数据，所以一个 `.zstd` 文件往往是几百个
  * **拼接的 zstd 帧**。Node 的 `zstdDecompressSync` 只解第一帧，流式 API 遇到
  * 第二帧会报 "Unknown frame descriptor"，因此这里自行扫帧边界逐帧解压。
+ *
+ * `node:zlib` 的 zstd API 并非所有 Node 都有（22.15 / 23.8 起才有，20 与 21 完全
+ * 没有）。所以这里按命名空间导入再做运行时判断，而不是具名导入——具名导入在
+ * 不支持的 Node 上会让整个模块链接失败，插件连加载都做不到，报错还是一条难懂的
+ * `does not provide an export named …`。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { zstdDecompressSync } from 'node:zlib';
+import * as zlib from 'node:zlib';
 
 const DSH_HOME = process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh');
 const SESSIONS_ROOT = path.join(DSH_HOME, 'sessions');
 const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
+
+/** `node:zlib` 是否提供 zstd。 */
+export function hasZstdSupport() {
+  return typeof zlib.zstdDecompressSync === 'function';
+}
+
+function zstdUnavailable() {
+  return new Error(
+    `this Node runtime (${process.version}) has no zstd support in node:zlib, `
+    + 'and DSH session logs are zstd-compressed. Node 22.15+, 23.8+ or 24+ is required.',
+  );
+}
+
+/** zstd 解压，不可用时给出可执行的报错而不是一条模块链接错误。 */
+export function zstdDecompress(buffer) {
+  if (!hasZstdSupport()) throw zstdUnavailable();
+  return zlib.zstdDecompressSync(buffer);
+}
 
 /** 一个会话目录里可能并存多代文件（session.jsonl / session.v3 / session.v4），取最高代。 */
 function generationOf(filename) {
@@ -89,9 +112,13 @@ export function findSessionFile(sessionId) {
  * @returns {Buffer}
  */
 export function decompressZstdAll(buf) {
+  // 必须在重试循环之外先判：循环里的 catch 会把"没有 zstd 支持"一并吞掉，
+  // 最后抛出误导性的"帧边界解析失败"。
+  if (!hasZstdSupport()) throw zstdUnavailable();
+
   const offsets = [];
   for (let i = buf.indexOf(MAGIC); i !== -1; i = buf.indexOf(MAGIC, i + 4)) offsets.push(i);
-  if (offsets.length === 0 || offsets[0] !== 0) return zstdDecompressSync(buf);
+  if (offsets.length === 0 || offsets[0] !== 0) return zstdDecompress(buf);
 
   const parts = [];
   let start = 0;
@@ -102,7 +129,7 @@ export function decompressZstdAll(buf) {
       const end = j < offsets.length ? offsets[j] : buf.length;
       if (end <= start) continue;
       try {
-        parts.push(zstdDecompressSync(buf.subarray(start, end)));
+        parts.push(zstdDecompress(buf.subarray(start, end)));
         start = end;
         cursor = j + 1;
         advanced = true;
