@@ -4,8 +4,9 @@
 #   ./install.sh
 #
 # Pack -> install -> report the profile's dependency and bundle registration.
-# Afterwards, refresh the DSH page (Cmd/Ctrl+R) for the client half; host-side
-# code changes require restarting DSH entirely.
+# Afterwards, HARD-refresh the DSH page (Cmd+Shift+R / Ctrl+Shift+R) for the
+# client half; host-side code changes require restarting DSH entirely. An
+# ordinary reload can serve the client bundle cached from a previous version.
 #
 # Overridable environment:
 #   DSH_HOME          DSH home                    (default: ~/.dsh)
@@ -128,4 +129,4 @@ console.log("   deps   :", JSON.stringify(after.dependencies ?? {}));
 console.log("   bundles:", (after.dsh?.profile?.bundles ?? []).join(", "));
 ' "$PROFILE_DIR/package.json" "$PACKAGE" "$PROFILE_DIR"
 
-echo "done. Host-side changes need a DSH restart; client changes need a page refresh."
+echo "done. Host-side changes need a DSH restart; client changes need a HARD refresh (Cmd/Ctrl+Shift+R)."

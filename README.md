@@ -109,10 +109,10 @@ override anything with:
 | `DSH_NODE` | first `node` found (PATH, then the DSH runtime) |
 | `DSH_PNPM` | first `pnpm` found (PATH, then the bundled `pnpm.mjs`) |
 
-Then **restart DSH** for the host half, and refresh the page (⌘R / Ctrl+R) for
-the client half. See [Known constraints](#known-constraints) for why. Forgetting
-the restart is the most common way to end up with a plugin that looks installed
-and silently does nothing.
+Then **restart DSH** for the host half, and **hard-refresh** the page
+(⌘⇧R / Ctrl+Shift+R) for the client half. See [Known constraints](#known-constraints)
+for why, and do not skip either step: they are the two most common ways to end up
+with a plugin that looks installed and behaves like the previous version.
 
 ### Updating and uninstalling
 
@@ -233,7 +233,9 @@ sending a patch.
 
 - **Host-side changes require a DSH restart.** The app hot-loads a *newly
   installed bundle*, but does not re-import changed file contents for a module it
-  has already loaded. The client half only needs a page refresh.
+  has already loaded. The client half needs a **hard** refresh (⌘⇧R /
+  Ctrl+Shift+R) — an ordinary reload can serve the bundle the browser cached
+  from the previous version, which looks exactly like "my change did nothing".
 - **Session formats v3 and v4 are supported.** Older chunk-row formats (v0–v2)
   produce a warning and an incomplete export.
 - **Files are read directly, not flushed first.** Exporting a session that is

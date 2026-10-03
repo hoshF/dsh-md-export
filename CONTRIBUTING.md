@@ -30,9 +30,11 @@ To install your working copy into a DSH profile:
 ./install.sh                    # packs, installs, reports profile state
 ```
 
-Host-side changes require **restarting DSH**; client-side changes only need a
-page refresh. The app hot-loads a newly installed bundle, but does not re-import
-changed file contents for a module it has already loaded.
+Host-side changes require **restarting DSH**; client-side changes need a **hard
+refresh** (⌘⇧R / Ctrl+Shift+R). The app hot-loads a newly installed bundle, but
+does not re-import changed file contents for a module it has already loaded, and
+an ordinary reload can reuse the client bundle the browser cached from the
+previous version.
 
 ## Hard constraint 1: no build step
 
