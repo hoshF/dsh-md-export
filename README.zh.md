@@ -32,7 +32,7 @@
 
 ## 产出
 
-一次对话导出为一个自包含的 Markdown 文件。下面是渲染器的真实输出，仅作了截短：
+一次对话导出为一个自包含的 Markdown 文件。下面是渲染器输出的**逐字节原样**——没有重打、没有手动折行、没有删减：
 
 ````markdown
 ## Metadata
@@ -58,8 +58,7 @@ See https://user-side.example.com/internal for context.
 
 #### 🤔 Thought Process
 
-The user wants the deploy steps captured. I should confirm the build passes
-before writing them down.
+The user wants the deploy steps captured. I should confirm the build passes before writing them down.
 
 #### 💡 Response
 
@@ -87,8 +86,7 @@ What about rollback?
 
 ### 🤖 Assistant
 
-Roll back with `make rollback TAG=<previous>`. The checklist is at
-https://example.com/release-checklist?utm_source=chat.
+Roll back with `make rollback TAG=<previous>`. The checklist is at https://example.com/release-checklist?utm_source=chat.
 
 ### References
 
@@ -238,7 +236,7 @@ npm run test:smoke              # 针对最新的真实会话
 node test/smoke-real-session.mjs <sessionId>
 ```
 
-CI 在 Node 22.15、24、26 上跑 40 条测试。提交补丁前请先看 [CONTRIBUTING.md](CONTRIBUTING.md) 里的两条硬约束——无构建步骤、净室实现。
+CI 在 Node 22.15、24、26 上跑 42 条测试。提交补丁前请先看 [CONTRIBUTING.md](CONTRIBUTING.md) 里的两条硬约束——无构建步骤、净室实现。
 
 ## 项目结构
 
@@ -255,6 +253,8 @@ CI 在 Node 22.15、24、26 上跑 40 条测试。提交补丁前请先看 [CONT
 | `test/render.test.mjs` | 事件流 → Markdown 行为，含 v0 工具结果 |
 | `test/host.test.mjs` | 路由测试，含信任围栏用例 |
 | `test/format.test.mjs` | 纯格式化辅助函数 |
+| `test/sample.mjs` | README 产出样例所依据的那段会话 |
+| `test/readme.test.mjs` | 断言已发布的样例与渲染器输出逐字节一致 |
 | `test/smoke-real-session.mjs` | 针对真实会话的手工检查 |
 
 ## 已知约束

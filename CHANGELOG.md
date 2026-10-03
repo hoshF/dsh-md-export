@@ -50,6 +50,12 @@ downstream tooling may parse it.
   The sample is annotated to point out the four behaviours it demonstrates
   (heading demotion, user-side URLs excluded from References, tracking parameters
   stripped, thinking and tool calls being opt-in).
+- **A test now guards the published sample.** The first draft of it had been
+  hand-wrapped, so it was not the renderer's output despite saying so.
+  `test/readme.test.mjs` renders `test/sample.mjs` and compares the result to the
+  block in both READMEs, reporting the first differing line. An intentional change
+  to the output therefore has to update the documentation, and an accidental one
+  fails the build instead of quietly making the README false. The suite is 42 tests.
 
 ## [1.6.1]
 

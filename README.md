@@ -32,8 +32,8 @@
 
 ## Output
 
-A conversation exports as one self-contained Markdown file. This is real output
-from the renderer, only shortened:
+A conversation exports as one self-contained Markdown file. This is the renderer's
+output verbatim — not retyped, not reflowed, nothing trimmed:
 
 ````markdown
 ## Metadata
@@ -59,8 +59,7 @@ See https://user-side.example.com/internal for context.
 
 #### 🤔 Thought Process
 
-The user wants the deploy steps captured. I should confirm the build passes
-before writing them down.
+The user wants the deploy steps captured. I should confirm the build passes before writing them down.
 
 #### 💡 Response
 
@@ -88,8 +87,7 @@ What about rollback?
 
 ### 🤖 Assistant
 
-Roll back with `make rollback TAG=<previous>`. The checklist is at
-https://example.com/release-checklist?utm_source=chat.
+Roll back with `make rollback TAG=<previous>`. The checklist is at https://example.com/release-checklist?utm_source=chat.
 
 ### References
 
@@ -300,7 +298,7 @@ npm run test:smoke              # against the newest real session
 node test/smoke-real-session.mjs <sessionId>
 ```
 
-40 tests run on Node 22.15, 24 and 26 in CI. See
+42 tests run on Node 22.15, 24 and 26 in CI. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the two hard constraints — no build step,
 clean-room implementation — before sending a patch.
 
@@ -319,6 +317,8 @@ clean-room implementation — before sending a patch.
 | `test/render.test.mjs` | Event stream → Markdown behaviour, including v0 tool results |
 | `test/host.test.mjs` | Route tests, including trust-fence cases |
 | `test/format.test.mjs` | Pure formatting helpers |
+| `test/sample.mjs` | The session the README's output sample is generated from |
+| `test/readme.test.mjs` | Asserts that published sample is byte-for-byte what the renderer emits |
 | `test/smoke-real-session.mjs` | Manual check against a real session |
 
 ## Known constraints

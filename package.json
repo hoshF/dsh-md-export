@@ -33,7 +33,7 @@
     "node": ">=22.15"
   },
   "scripts": {
-    "test": "node --test test/format.test.mjs test/render.test.mjs test/host.test.mjs",
+    "test": "node --test test/format.test.mjs test/render.test.mjs test/host.test.mjs test/readme.test.mjs",
     "test:smoke": "node test/smoke-real-session.mjs"
   },
   "dsh": {
