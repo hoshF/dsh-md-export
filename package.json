@@ -47,5 +47,14 @@
       ],
       "platform": "web"
     }
+  },
+  "author": "hoshF",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoshF/dsh-md-export.git"
+  },
+  "homepage": "https://github.com/hoshF/dsh-md-export#readme",
+  "bugs": {
+    "url": "https://github.com/hoshF/dsh-md-export/issues"
   }
 }

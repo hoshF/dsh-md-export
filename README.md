@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md) · [Format contract](docs/FORMAT.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
-[![CI](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml)
+[![CI](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml)
 
 An **"导出 MD" button in the DSH Web session header** that exports the current
 conversation as clean Markdown through a **native save dialog**. It ships as a
@@ -90,7 +90,7 @@ could not be installed this way.
 **From a checkout.**
 
 ```sh
-git clone <this repo> && cd dsh-md-export
+git clone https://github.com/hoshF/dsh-md-export.git && cd dsh-md-export
 ./install.sh
 ```
 

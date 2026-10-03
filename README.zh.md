@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文 · [格式契约](docs/FORMAT.md) · [贡献指南](CONTRIBUTING.md) · [变更日志](CHANGELOG.md)
 
-[![CI](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dsh-md-export/actions/workflows/ci.yml)
+[![CI](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml/badge.svg)](https://github.com/hoshF/dsh-md-export/actions/workflows/ci.yml)
 
 DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出**系统原生保存窗口**，
 把当前会话导出为干净可读的 Markdown。它以自包含的**双面插件**形式交付（宿主路由 +
@@ -85,7 +85,7 @@ pnpm 会拦截 git 托管依赖的 `prepare` 脚本，所以任何需要构建�
 **从源码装。**
 
 ```sh
-git clone <本仓库> && cd dsh-md-export
+git clone https://github.com/hoshF/dsh-md-export.git && cd dsh-md-export
 ./install.sh
 ```
 
