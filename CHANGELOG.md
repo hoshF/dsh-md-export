@@ -19,6 +19,24 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.4.1]
+
+### Fixed
+
+- **A brand-new conversation exported as `dsh-<short id>.md`.** The client
+  fetched the filename once on mount and kept that snapshot forever. A new
+  conversation has no title at the moment its session view mounts — the title is
+  produced after the first prompt — so the snapshot was the untitled fallback,
+  and it stayed wrong until the component happened to remount (switching to
+  another conversation and back). The name is now refetched on every click, with
+  the mount-time snapshot kept only as a fallback when that request fails, and
+  the request is bounded by a timeout so it cannot stall the save dialog.
+
+  The reasoning behind the original ordering was overstated: the point is to
+  reach `showSaveFilePicker()` inside the transient activation window (~5s), and
+  a local metadata request costs milliseconds. Refetching first is safe; caching
+  a pre-title snapshot is not.
+
 ## [1.4.0]
 
 ### Added

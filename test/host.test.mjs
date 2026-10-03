@@ -40,6 +40,19 @@ writeSession(home, {
   events: [{ type: 'session/title', seq: 1, time: 1790000000000, data: { title: CJK_TITLE } }],
 });
 
+// A session that has no title yet — the state of a brand-new conversation. The
+// client must not treat this as final: the title arrives after the first prompt.
+const UNTITLED_ID = 'session-unttl0001-0000-4000-8000-000000000001';
+writeSession(home, {
+  sessionId: UNTITLED_ID,
+  events: [{
+    type: 'user/message',
+    seq: 1,
+    time: 1790000000000,
+    data: { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'untitled' }] },
+  }],
+});
+
 process.env.DSH_HOME = home;
 const { createMdExportHandler, MD_EXPORT_PATH } = await import('../src/index.js');
 
@@ -112,6 +125,12 @@ test('meta=1 returns a lightweight JSON payload carrying the filename', async ()
   assert.equal(meta.filename, `${TITLE}.md`);
   assert.equal(meta.model, 'fixture-model');
   assert.equal(meta.version, 4);
+});
+
+test('a session with no title yet falls back to a short-id filename', async () => {
+  const meta = await (await fetch(`${base}${MD_EXPORT_PATH}?meta=1&sessionId=${UNTITLED_ID}`)).json();
+  assert.equal(meta.title, null);
+  assert.equal(meta.filename, 'dsh-unttl000.md');
 });
 
 test('POST accepts the same options as JSON', async () => {
