@@ -79,7 +79,7 @@ test('formatLocalTime is stable and carries a timezone offset', () => {
 
 test('markdownFilename prefers the conversation title', () => {
   const header = { id: 'session-abc12345' };
-  assert.equal(markdownFilename(header, '不拆书高质量扫描设备'), '不拆书高质量扫描设备.md');
+  assert.equal(markdownFilename(header, '中文标题示例'), '中文标题示例.md');
   assert.equal(markdownFilename(header, 'Plain title'), 'Plain title.md');
 });
 

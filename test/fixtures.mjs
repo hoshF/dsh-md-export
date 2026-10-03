@@ -203,9 +203,3 @@ export function writeSession(root, options = {}) {
 
   return { file, sessionId, sessionDir };
 }
-
-/** Convenience: create a fixture DSH home and return its path. */
-export function writeSessionHome(root, options = {}) {
-  writeSession(root, options);
-  return root;
-}

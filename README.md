@@ -22,9 +22,9 @@ shares the exact same rendering core.
 
 - **Model:** `deepseek-flash`
 - **Time:** 2026-10-03 00:08:43 -07:00
-- **Session:** `session-1357ec0e-f8da-4ac9-9cfa-0df8f24d48f2`
-- **Workspace:** `/Users/hoshf`
-- **URL:** http://127.0.0.1:19387
+- **Session:** `session-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d`
+- **Workspace:** `/home/you/notes`
+- **URL:** http://127.0.0.1:8080
 
 ## Conversation
 
@@ -113,7 +113,7 @@ the client half. See [Known constraints](#known-constraints) for why.
 
 **In the app.** The button sits in the session header's utilities slot. Clicking
 it opens the OS save dialog immediately, then writes the Markdown. The suggested
-filename is the conversation title — e.g. `不拆书高质量扫描设备.md`.
+filename is the conversation title — e.g. `Refactoring the parser.md`.
 
 **CLI.**
 

@@ -34,7 +34,7 @@ writeSession(home, {
 
 // A non-ASCII title, to exercise the ASCII fallback in Content-Disposition.
 const CJK_ID = 'session-fixture-cjk-0001';
-const CJK_TITLE = '不拆书高质量扫描设备';
+const CJK_TITLE = '中文标题示例';
 writeSession(home, {
   sessionId: CJK_ID,
   events: [{ type: 'session/title', seq: 1, time: 1790000000000, data: { title: CJK_TITLE } }],

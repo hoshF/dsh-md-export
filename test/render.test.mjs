@@ -23,7 +23,7 @@ process.on('exit', () => rmSync(home, { recursive: true, force: true }));
 const { file } = writeSession(home);
 const log = readSessionLog(file);
 
-const render = (opts = {}) => renderMarkdown(log, opts, { origin: 'http://127.0.0.1:19387' });
+const render = (opts = {}) => renderMarkdown(log, opts, { origin: 'http://127.0.0.1:8080' });
 
 test('reads every zstd frame, not just the first', () => {
   const { markdown } = render();
@@ -44,7 +44,7 @@ test('metadata block reports model, time, session and workspace', () => {
   assert.match(markdown, /- \*\*Time:\*\* \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}/);
   assert.match(markdown, /- \*\*Session:\*\* `session-fixture-0001/);
   assert.match(markdown, /- \*\*Workspace:\*\* `\/tmp\/fixture-workspace`/);
-  assert.ok(markdown.includes('- **URL:** http://127.0.0.1:19387'));
+  assert.ok(markdown.includes('- **URL:** http://127.0.0.1:8080'));
 });
 
 test('document starts at ## Metadata and has no H1 by default', () => {

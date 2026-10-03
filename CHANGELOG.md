@@ -21,6 +21,38 @@ downstream tooling may parse it.
 
 ## [Unreleased]
 
+## [1.3.1]
+
+Housekeeping pass over dead code, hardcoded values, and the repository's own
+environment leakage.
+
+### Fixed
+
+- **`collectLinks` used a 400-character proximity window** to guess whether a
+  bare URL was already part of a `[label](url)` link. Long labels and several
+  links in one paragraph were misjudged, so a URL could be counted twice or
+  missed entirely. Link spans are now masked out exactly before scanning for
+  bare URLs, and the heuristic is gone.
+
+### Changed
+
+- Magic numbers replaced with named constants: the filename stem cap, the
+  short-id length, the markdown label cap, and the client's "saved" state
+  duration.
+- The fallback filename is built by one shared function
+  (`fallbackMarkdownFilename`) instead of being spelled out in `src/render.js`
+  and again in `src/index.js`. The client's copy cannot be shared, and now says
+  why it mirrors the host.
+- Both sides of the duplicated route path point at each other, since a browser
+  module cannot import host ESM and a change has to be made in two places.
+- Removed the unused `writeSessionHome` fixture helper.
+
+### Removed
+
+- Real session identifiers, workspace paths, port numbers and conversation
+  titles that had leaked into the READMEs, the changelog and the tests from the
+  machine this was developed on. Every example is synthetic now.
+
 ## [1.3.0]
 
 Clean-room rewrite, a real test suite, and the project scaffolding needed to
@@ -69,7 +101,7 @@ publish it.
 ### Changed
 
 - **The suggested filename is now the conversation title** (for example
-  `不拆书高质量扫描设备.md`) instead of `dsh-<id>-<timestamp>.md`. Falls back to
+  `重构解析器.md`) instead of `dsh-<id>-<timestamp>.md`. Falls back to
   `dsh-<short id>.md` when the session has no title.
 
 ## [1.1.0]

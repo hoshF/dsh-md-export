@@ -193,20 +193,29 @@ class ReferenceCollector {
   }
 }
 
-/** 从一段 Markdown 文本里抽出 `[title](url)` 与裸 URL。 */
+/** 引号内联链接：[标签](url)。标签长度设上限，避免把整段文本当标签回溯。 */
+const MARKDOWN_LINK = /\[([^\]]{0,300})\]\((https?:\/\/[^)\s]+)\)/g;
+/** 裸 URL，前面不能紧跟 ( < 或词字符（否则它多半是某个标记的一部分）。 */
+const BARE_URL = /(?<![(<\w])(https?:\/\/[^\s<>()"']+)/g;
+
+/**
+ * 从一段 Markdown 文本里抽出链接并登记为引用。
+ *
+ * 先收集 `[标签](url)`，再把它们的区间从文本里抹掉，最后在剩余文本里找裸 URL。
+ * 早先这里用「匹配位置是否落在某个链接起始点之后 400 字符内」来近似判断，
+ * 长标签或同段落多个链接都会判错；抹除区间是精确的，也不再需要魔法窗口。
+ */
 function collectLinks(text, refs) {
   if (!text) return;
-  const seenSpans = [];
-  for (const m of text.matchAll(/\[([^\]]{0,200})\]\((https?:\/\/[^)\s]+)\)/g)) {
-    refs.add(m[1], m[2]);
-    seenSpans.push(m.index);
+
+  let masked = text;
+  for (const match of text.matchAll(MARKDOWN_LINK)) {
+    refs.add(match[1], match[2]);
+    const start = match.index;
+    masked = masked.slice(0, start) + ' '.repeat(match[0].length) + masked.slice(start + match[0].length);
   }
-  // 裸 URL（跳过已作为 markdown 链接出现的位置）
-  for (const m of text.matchAll(/(?<![(<\w])(https?:\/\/[^\s<>()"']+)/g)) {
-    const inside = seenSpans.some((start) => m.index > start && m.index < start + 400);
-    if (inside) continue;
-    refs.add('', m[1]);
-  }
+
+  for (const match of masked.matchAll(BARE_URL)) refs.add('', match[1]);
 }
 
 // ------------------------------------------------------------------ 事件 → 轮次
@@ -412,19 +421,32 @@ function fence(text, lang = '') {
   return `${f}${lang}\n${text}\n${f}`;
 }
 
+/** 文件名主体长度上限：标题可能很长，但文件名不该长到难以阅读。 */
+const MAX_FILENAME_STEM = 80;
+/** 退回命名里保留的会话 id 字符数（去掉 `session-` 前缀之后）。 */
+const SHORT_ID_LENGTH = 8;
+
+/** 从会话 id 造一个稳定的短标识，用于无标题时的退回命名。 */
+export function shortSessionId(sessionId) {
+  return String(sessionId ?? 'session').replace(/^session-/, '').slice(0, SHORT_ID_LENGTH);
+}
+
+/** 无标题时的退回文件名，形如 `dsh-1a2b3c4d.md`。 */
+export function fallbackMarkdownFilename(sessionId) {
+  return `dsh-${shortSessionId(sessionId)}.md`;
+}
+
 /**
  * 文件名 = 会话标题：只保留标题本身，不带短 id、不带时间戳。
- * 标题缺失或清洗后为空时退回 `dsh-<短id>.md`。
+ * 标题缺失或清洗后为空时退回 `fallbackMarkdownFilename()`。
  */
 export function markdownFilename(header, title) {
   const cleaned = (title ?? '')
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 80)
+    .slice(0, MAX_FILENAME_STEM)
     .replace(/[.\s]+$/, '')
     .trim();
-  if (cleaned) return `${cleaned}.md`;
-  const id8 = String(header?.id ?? 'session').replace(/^session-/, '').slice(0, 8);
-  return `dsh-${id8}.md`;
+  return cleaned ? `${cleaned}.md` : fallbackMarkdownFilename(header?.id);
 }

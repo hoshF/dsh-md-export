@@ -7,13 +7,20 @@
  */
 
 import { findSessionFile, readSessionLog } from './session.js';
-import { renderMarkdown, markdownFilename, extractModel } from './render.js';
+import { renderMarkdown, markdownFilename, extractModel, fallbackMarkdownFilename } from './render.js';
 
 export const name = 'md-export';
 export const inject = ['webServer', 'webRuntime'];
 
+/**
+ * 路由路径。客户端 `lib/client.js` 里的 `ENDPOINT` 必须与之一致：浏览器模块
+ * 无法 import 宿主 ESM，这个重复是结构性的，改一处就要改两处。
+ */
 export const MD_EXPORT_PATH = '/api/md-export';
+/** 请求体上限：这里只接受一个会话 id 和几个布尔开关。 */
 const MAX_BODY_BYTES = 4096;
+/** Content-Disposition 的 filename= 只接受 ASCII。 */
+const ASCII_ONLY = /^[\x20-\x7e]+$/;
 
 // ------------------------------------------------------------------ 请求边界
 
@@ -85,8 +92,8 @@ function writeText(response, status, text) {
 }
 
 function asciiFallback(filename, sessionId) {
-  if (/^[\x20-\x7e]+$/.test(filename)) return filename;
-  return `dsh-${String(sessionId).replace(/^session-/, '').slice(0, 8)}.md`;
+  if (ASCII_ONLY.test(filename)) return filename;
+  return fallbackMarkdownFilename(sessionId);
 }
 
 // ------------------------------------------------------------------ 处理器

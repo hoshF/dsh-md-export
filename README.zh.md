@@ -21,9 +21,9 @@ DSH Web 会话标题栏上的一颗 **「导出 MD」按钮**：点击后弹出*
 
 - **Model:** `deepseek-flash`
 - **Time:** 2026-10-03 00:08:43 -07:00
-- **Session:** `session-1357ec0e-f8da-4ac9-9cfa-0df8f24d48f2`
-- **Workspace:** `/Users/hoshf`
-- **URL:** http://127.0.0.1:19387
+- **Session:** `session-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d`
+- **Workspace:** `/home/you/notes`
+- **URL:** http://127.0.0.1:8080
 
 ## Conversation
 
@@ -106,7 +106,7 @@ git clone <本仓库> && cd dsh-md-export
 ## 用法
 
 **界面内。** 按钮位于会话标题栏的 utilities 插槽。点击后**立刻弹出系统保存框**，
-随后写入 Markdown。建议文件名即对话标题，例如 `不拆书高质量扫描设备.md`。
+随后写入 Markdown。建议文件名即对话标题，例如 `重构解析器.md`。
 
 **命令行。**
 
