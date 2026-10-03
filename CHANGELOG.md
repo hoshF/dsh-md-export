@@ -19,6 +19,22 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.5.1]
+
+### Changed
+
+- **The toast's check is green, and it is the host's own glyph.** Two details
+  make it native rather than approximate. The colour is the host's semantic token
+  `--dsw-alias-state-success-primary`, defined as `var(--dsw-static-green-500)` and
+  already used by the app for green status text and added-line counts — so it
+  follows the theme instead of hardcoding a hex that would be wrong in one of
+  them. The glyph is the host's `IconCheckOutlineRegular`, so the stroke weight
+  matches the icons around it.
+
+  Both are resolved defensively. If either name is missing the plugin falls back
+  to its own check coloured by the same token, and if the primitive package cannot
+  be required at all the toast is simply absent.
+
 ## [1.5.0]
 
 ### Added
