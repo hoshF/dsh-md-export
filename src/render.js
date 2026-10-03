@@ -1,15 +1,18 @@
 /**
- * 会话事件 → Markdown（对齐 AfterChat / ChatFormat 的对话导出规范）。
+ * 会话事件 → Markdown。
  *
- * 结构：
- *   ## Metadata        —— 项目符号 + 粗体键 + 反引号值（不用表格）
- *   ## Conversation    —— ### 🧑‍💻 User / ### 🤖 Assistant，无轮次号、无分隔线
+ * 文档结构：
+ *   ## Metadata        —— 项目符号 + 粗体键 + 反引号值
+ *   ## Conversation    —— ### 🧑‍💻 User / ### 🤖 Assistant
  *                        可选 #### 🤔 Thought Process + #### 💡 Response
- *   ### References     —— 按 URL 归一化去重，按首次出现编号
+ *   ### References     —— 按归一化 URL 去重，按首次出现编号
  *
- * 两条来自该规范的关键规则：
- *   1. 正文里的 `# 标题` 转成 `**加粗**`（围栏感知），保证正文永远压不过文档大纲。
- *   2. 引用按「首次出现顺序」编号，URL 归一化（去 hash、去 tracking 参数、去尾斜杠）。
+ * 两条贯穿全文的规则：
+ *   1. 正文里的 `# 标题` 降级为 `**加粗**`（围栏感知），保证正文永远压不过文档大纲。
+ *   2. 引用按「首次出现顺序」编号；URL 先归一化（去 hash、去追踪参数、去尾斜杠）再去重。
+ *
+ * 本文件是独立实现。文档格式沿用了 ChatFormat 一类的对话导出约定（见 README 致谢），
+ * 但算法与代码均为本仓库自写，未取自任何其他导出器的源码。
  */
 
 const ROLE_USER = '### 🧑‍💻 User';
@@ -29,114 +32,164 @@ const pad2 = (n) => String(n).padStart(2, '0');
 /** 本地时间 + 时区偏移，如 2026-10-02 13:29:56 -07:00。 */
 export function formatLocalTime(ms) {
   if (!ms) return 'unknown';
-  const d = new Date(ms);
-  if (Number.isNaN(d.getTime())) return 'unknown';
-  const offMin = -d.getTimezoneOffset();
-  const off = `${offMin >= 0 ? '+' : '-'}${pad2(Math.floor(Math.abs(offMin) / 60))}:${pad2(Math.abs(offMin) % 60)}`;
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} `
-    + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())} ${off}`;
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+
+  const totalOffsetMinutes = -date.getTimezoneOffset();
+  const sign = totalOffsetMinutes < 0 ? '-' : '+';
+  const absolute = Math.abs(totalOffsetMinutes);
+  const offset = `${sign}${pad2(Math.floor(absolute / 60))}:${pad2(absolute % 60)}`;
+
+  const day = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  const clock = `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+  return `${day} ${clock} ${offset}`;
+}
+
+/** 去掉 `**` 强调，使降级后的标题落在同一层加粗里。行内代码段原样保留。 */
+function withoutEmphasis(content) {
+  const strip = (chunk) => chunk.split('**').join('');
+  let result = '';
+  let cursor = 0;
+  for (;;) {
+    const open = content.indexOf('`', cursor);
+    if (open === -1) return result + strip(content.slice(cursor));
+    const close = content.indexOf('`', open + 1);
+    if (close === -1) return result + strip(content.slice(cursor));
+    result += strip(content.slice(cursor, open)) + content.slice(open, close + 1);
+    cursor = close + 1;
+  }
 }
 
 /**
- * `# 标题` → `**标题**`。围栏（``` / ~~~）内部原样保留，否则会破坏 Shell/Python
- * 的 `# 注释`。标题内原有的 `**` 会被吸收进同一层加粗。
+ * `# 标题` 行 → `**标题**` 行；其余行原样返回。
+ * 缩进、制表符与围栏外的普通文本都不受影响。
+ */
+function demoteHeadingLine(line) {
+  const match = /^#{1,6}[ \t]+(.*)$/.exec(line);
+  if (match === null) return line;
+  const title = withoutEmphasis(match[1]).trim();
+  return title === '' ? line : `**${title}**`;
+}
+
+/**
+ * 把正文里的标题标记降级为加粗，使其无法与本文件生成的 `##` / `###` 大纲竞争。
+ *
+ * 围栏（``` 与 ~~~）内部逐字节保留——Shell 与 Python 的 `# 注释` 不是标题。
+ * 按 CommonMark 的规则，闭合围栏必须使用同一字符且长度不短于开启围栏。
  */
 export function stripHashes(text) {
   if (text === null || text === undefined) return '';
-  let fence = null;
-  return String(text)
-    .split('\n')
-    .map((line) => {
-      const trimmed = line.trimStart();
-      const mark = trimmed.startsWith('```') ? '```' : trimmed.startsWith('~~~') ? '~~~' : '';
+  const lines = String(text).split('\n');
+  const output = [];
+  let openFence = null;
+
+  for (const line of lines) {
+    const fence = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+    if (openFence === null) {
       if (fence !== null) {
-        if (mark === fence) fence = null;
-        return line;
+        openFence = { char: fence[1][0], length: fence[1].length };
+        output.push(line);
+      } else {
+        output.push(demoteHeadingLine(line));
       }
-      if (mark) {
-        fence = mark;
-        return line;
-      }
-      return line.replace(/^#{1,6}\s+(.+)$/, (match, content) => {
-        const merged = content
-          .split(/(`+[^`]*`+)/)
-          .map((seg, i) => (i % 2 ? seg : seg.replace(/\*\*/g, '')))
-          .join('');
-        const inner = merged.trim();
-        return inner ? `**${inner}**` : match;
-      });
-    })
-    .join('\n');
+      continue;
+    }
+    output.push(line);
+    if (fence !== null && fence[1][0] === openFence.char && fence[1].length >= openFence.length) {
+      openFence = null;
+    }
+  }
+  return output.join('\n');
 }
 
-/** URL 归一化：去 hash、去 tracking 参数、去冗余尾斜杠。 */
+/**
+ * 仅用于归因与统计、从 URL 中剔除的参数。
+ * 收录标准：该参数的存在只为标记来源渠道，去掉后不影响资源定位。
+ * 这是一个按上述标准自行拟定的清单，不是从任何项目抄来的。
+ */
+const ATTRIBUTION_PARAMS = [
+  // 通用营销归因（Urchin Tracking Module 家族及其常见扩展）
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'utm_name',
+  // 各广告平台的点击标识
+  'fbclid', 'gclid', 'gclsrc', 'dclid', 'msclkid', 'twclid', 'igshid', 'yclid', 'ttclid', 'li_fat_id',
+  // 邮件与联盟营销
+  'mc_cid', 'mc_eid', 'mkt_tok', '_openstat', 'wickedid',
+  // 站内来源标记
+  'spm', 'scm', 'ref', 'ref_src', 'referrer', 'source', 'from', 'feature',
+];
+
+/** URL 归一化：去 hash、去归因参数、去多余的尾斜杠。无法解析时退化为文本清洗。 */
 export function normalizeRefUrl(rawUrl) {
   if (!rawUrl) return '';
-  const str = String(rawUrl).trim();
-  if (!str) return '';
+  const text = String(rawUrl).trim();
+  if (text === '') return '';
   try {
-    const u = new URL(str);
-    u.hash = '';
-    for (const p of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-      'spm', 'from', 'source', 'feature', 'ref', 'ref_src', 'fbclid', 'gclid', 'msclkid', 'ved', 'ei']) {
-      u.searchParams.delete(p);
-    }
-    let res = u.toString();
-    if (res.endsWith('/') && !res.endsWith('://')) res = res.slice(0, -1);
-    return res;
+    const url = new URL(text);
+    url.hash = '';
+    for (const param of ATTRIBUTION_PARAMS) url.searchParams.delete(param);
+    const rendered = url.toString();
+    return rendered.endsWith('/') && !rendered.endsWith('://') ? rendered.slice(0, -1) : rendered;
   } catch {
-    return str.split('#')[0].trim().replace(/\/+$/, '');
+    return text.split('#')[0].trim().replace(/\/+$/, '');
   }
 }
 
-/** `- [n] [title](url)`，标题缺失或等于 URL 时退化。 */
+/** 一行引用：`- [n] [标题](url)`；标题缺失或与 URL 相同时退化为自链接。 */
 export function formatRefLine(num, title, url) {
-  const norm = normalizeRefUrl(url);
-  const clean = (title ?? '').trim();
-  if (clean && clean !== norm && clean !== url) {
-    return norm ? `- [${num}] [${clean}](${norm})` : `- [${num}] ${clean}`;
-  }
-  if (norm) return `- [${num}] [${norm}](${norm})`;
-  return `- [${num}] ${clean || 'unknown'}`;
+  const link = normalizeRefUrl(url);
+  const label = String(title ?? '').trim();
+  const labelled = label !== '' && label !== link && label !== url;
+
+  if (labelled && link !== '') return `- [${num}] [${label}](${link})`;
+  if (link !== '') return `- [${num}] [${link}](${link})`;
+  return `- [${num}] ${labelled ? label : 'unknown'}`;
 }
 
 /** 本机地址不是「信源」：正文里调试用的 127.0.0.1 / localhost 链接不进 References。 */
 function isInternalUrl(url) {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return host === 'localhost' || host === '::1' || host === '0.0.0.0'
-      || host === '[::1]' || /^127\./.test(host);
+    return host === 'localhost' || host === '::1' || host === '[::1]' || host === '0.0.0.0'
+      || /^127\./.test(host);
   } catch {
     return false;
   }
 }
 
-/** 按 URL 归一化去重的引用注册器，编号即首次出现顺序。 */
+/**
+ * 按归一化 URL 去重的引用集合。
+ * 编号不预先存储，而是在渲染时按 Map 的插入顺序推导——插入顺序即首次出现顺序。
+ */
 class ReferenceCollector {
   constructor() {
-    this.byUrl = new Map();
-    this.list = [];
+    this.entries = new Map();
+  }
+
+  get size() {
+    return this.entries.size;
   }
 
   add(title, url) {
-    const norm = normalizeRefUrl(url);
-    if (!norm || isInternalUrl(norm)) return null;
-    const existing = this.byUrl.get(norm);
-    if (existing) {
-      // 先到者可能没标题，后来者补上
-      if (!existing.title && title) existing.title = String(title).trim();
-      return existing.num;
+    const key = normalizeRefUrl(url);
+    if (key === '' || isInternalUrl(key)) return;
+
+    const label = String(title ?? '').trim();
+    const existing = this.entries.get(key);
+    if (existing !== undefined) {
+      // 先出现的可能没有标题，后来的可以补上
+      if (existing === '' && label !== '') this.entries.set(key, label);
+      return;
     }
-    const num = this.list.length + 1;
-    const entry = { num, title: (title ?? '').trim(), url: norm };
-    this.byUrl.set(norm, entry);
-    this.list.push(entry);
-    return num;
+    this.entries.set(key, label);
   }
 
   render() {
-    if (this.list.length === 0) return [];
-    return ['### References', '', ...this.list.map((r) => formatRefLine(r.num, r.title, r.url)), ''];
+    if (this.entries.size === 0) return [];
+    const lines = ['### References', ''];
+    let num = 1;
+    for (const [url, title] of this.entries) lines.push(formatRefLine(num++, title, url));
+    lines.push('');
+    return lines;
   }
 }
 
@@ -166,7 +219,8 @@ export function buildTurns(events, opts = {}) {
   const turns = [];
   const refs = new ReferenceCollector();
   let current = null;
-  let toolIndex = new Map();
+  let toolIndex = new Map();   // callId → 工具记录（仅 tools 开启时填充）
+  let toolNames = new Map();   // callId → 调用名（始终填充，References 依赖它）
 
   const ensure = () => {
     if (current === null) {
@@ -187,6 +241,7 @@ export function buildTurns(events, opts = {}) {
           current = { human: text, assistant: [], reasoning: [], tools: [], injected: [], system: [], aborted: false };
           turns.push(current);
           toolIndex = new Map();
+          toolNames = new Map();
         } else if (opts.injected && text) {
           ensure().injected.push({ kind: kind ?? 'unknown', text });
         }
@@ -206,10 +261,15 @@ export function buildTurns(events, opts = {}) {
             textParts.push(block.text);
           } else if (block?.type === 'reasoning' && opts.reasoning && block.text?.trim()) {
             turn.reasoning.push(block.text.trim());
-          } else if (block?.type === 'tool-call' && opts.tools) {
-            const record = { name: block.name ?? 'tool', arguments: block.arguments ?? '', result: null, isError: false };
-            turn.tools.push(record);
-            if (block.id) toolIndex.set(block.id, record);
+          } else if (block?.type === 'tool-call') {
+            // 调用名始终登记（References 要靠它识别 web 检索结果），
+            // 但只有开启 tools 时才把调用本身写进文档。
+            if (block.id) toolNames.set(block.id, block.name ?? 'tool');
+            if (opts.tools) {
+              const record = { name: block.name ?? 'tool', arguments: block.arguments ?? '', result: null, isError: false };
+              turn.tools.push(record);
+              if (block.id) toolIndex.set(block.id, record);
+            }
           }
         }
         // 引用收集只看助手正文，且不受 --tools/--reasoning 开关影响
@@ -217,11 +277,11 @@ export function buildTurns(events, opts = {}) {
         break;
       }
       case 'tool/result': {
-        const name = toolIndex.get(data.message?.toolCallId ?? data.toolCallId)?.name;
+        const callId = data.message?.toolCallId ?? data.toolCallId;
+        const name = callId ? toolNames.get(callId) : undefined;
         const body = textOf(data.message?.content);
         if (opts.tools) {
-          const id = data.message?.toolCallId ?? data.toolCallId;
-          const record = id ? toolIndex.get(id) : null;
+          const record = callId ? toolIndex.get(callId) : null;
           if (record) {
             record.result = body;
             record.isError = Boolean(data.message?.isError);
@@ -229,7 +289,7 @@ export function buildTurns(events, opts = {}) {
             ensure().tools.push({ name: '（未匹配的工具结果）', arguments: '', result: body, isError: Boolean(data.message?.isError) });
           }
         }
-        // web 检索结果里的信源同样计入 References（对齐规范的 SEARCH 片段语义）
+        // web 检索结果里的信源同样计入 References（对应规范的 SEARCH 片段语义）
         if (name === 'web_search' || name === 'web_fetch') collectLinks(body, refs);
         break;
       }
@@ -340,7 +400,7 @@ export function renderMarkdown({ header, events }, opts = {}, meta = {}) {
   return {
     markdown: `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`,
     turnCount: real.length,
-    referenceCount: refs.list.length,
+    referenceCount: refs.size,
     title,
   };
 }
@@ -353,7 +413,7 @@ function fence(text, lang = '') {
 }
 
 /**
- * 文件名 = 会话标题（对齐 AfterChat 的命名：纯标题，无短 id、无时间戳）。
+ * 文件名 = 会话标题：只保留标题本身，不带短 id、不带时间戳。
  * 标题缺失或清洗后为空时退回 `dsh-<短id>.md`。
  */
 export function markdownFilename(header, title) {
