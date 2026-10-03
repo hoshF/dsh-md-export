@@ -107,7 +107,20 @@ override anything with:
 | `DSH_PNPM` | first `pnpm` found (PATH, then the bundled `pnpm.mjs`) |
 
 Then **restart DSH** for the host half, and refresh the page (⌘R / Ctrl+R) for
-the client half. See [Known constraints](#known-constraints) for why.
+the client half. See [Known constraints](#known-constraints) for why. Forgetting
+the restart is the most common way to end up with a plugin that looks installed
+and silently does nothing.
+
+### Updating and uninstalling
+
+There are no npm releases. The app installs whatever the default branch holds,
+resolved to a specific commit, so **updating means installing again**: paste the
+repository URL into **Plugins → Add plugin** a second time, or re-run
+`./install.sh` — it is idempotent and reconciles the profile itself. To pin a
+version, install from a tag rather than from the branch.
+
+To remove it, uninstall `dsh-md-export` from the **Plugins** page; that drops
+both the dependency and its bundle registration.
 
 ## Usage
 

@@ -81,19 +81,44 @@ cd "$PROFILE_DIR"
 run_pnpm remove "$PACKAGE" >/dev/null 2>&1 || true
 run_pnpm add "file:$TARBALL" >/dev/null
 
-# ------------------------------------------------------------------ report
+# ------------------------------------------------------------------ register
 
-echo "-> profile state"
+# Installing the dependency is not enough: a profile only loads a package that
+# is also listed in `dsh.profile.bundles`. `dsh plugin` and the app's Plugins
+# page both reconcile this list after installing; do the same here, or a fresh
+# clone installs a plugin that never runs.
+echo "-> registering the bundle"
 "$NODE" -e '
 const fs = require("fs");
-const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-const pkg = process.argv[2];
+const path = require("path");
+const [manifestPath, pkg, profileDir] = process.argv.slice(1);
+
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const bundles = manifest.dsh?.profile?.bundles ?? [];
-console.log("   deps   :", JSON.stringify(manifest.dependencies ?? {}));
-console.log("   bundles:", bundles.join(", "));
-if (!bundles.includes(pkg)) {
-  console.log(`   ! missing bundle registration: append "${pkg}" to dsh.profile.bundles`);
+
+// Only a package that actually ships a bundle patch belongs in the layer list.
+let declaresBundle = false;
+try {
+  const installed = JSON.parse(
+    fs.readFileSync(path.join(profileDir, "node_modules", pkg, "package.json"), "utf8"));
+  declaresBundle = installed.dsh?.bundle?.patch !== undefined;
+} catch {
+  // Leave the manifest alone rather than guessing.
 }
-' "$PROFILE_DIR/package.json" "$PACKAGE"
+
+if (!declaresBundle) {
+  console.log(`   ! ${pkg} declares no dsh.bundle patch; not registering a layer`);
+} else if (bundles.includes(pkg)) {
+  console.log(`   ${pkg} is already registered`);
+} else {
+  manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, pkg] } };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(`   registered ${pkg} in dsh.profile.bundles`);
+}
+
+const after = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+console.log("   deps   :", JSON.stringify(after.dependencies ?? {}));
+console.log("   bundles:", (after.dsh?.profile?.bundles ?? []).join(", "));
+' "$PROFILE_DIR/package.json" "$PACKAGE" "$PROFILE_DIR"
 
 echo "done. Host-side changes need a DSH restart; client changes need a page refresh."

@@ -21,6 +21,22 @@ downstream tooling may parse it.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`install.sh` installed the dependency but never registered the bundle.** A
+  profile only loads a package listed in `dsh.profile.bundles`, so a fresh clone
+  produced a plugin that was present and completely inert — the script warned
+  about the missing registration instead of performing it. It now reconciles the
+  list the way `dsh plugin` and the app's Plugins page do, and is idempotent.
+  This went unnoticed because the development profile already had the
+  registration from an earlier manual install; the from-scratch path was never
+  exercised.
+
+### Added
+
+- README: how to update and uninstall, and a note that a git install resolves to
+  a commit, so updating means installing again.
+
 ## [1.3.1]
 
 Housekeeping pass over dead code, hardcoded values, and the repository's own
