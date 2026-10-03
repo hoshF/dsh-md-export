@@ -20,17 +20,29 @@ import { sampleMarkdown } from './sample.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
+/**
+ * The Time line is the one row that cannot be reproduced anywhere.
+ * `formatLocalTime` deliberately formats in the machine's own timezone, so a
+ * laptop at -07:00 and CI in UTC legitimately disagree — which is how this test
+ * first failed, on every Node version, at line 4. It is normalised on both sides;
+ * every other row is still compared byte-for-byte.
+ */
+const PLACEHOLDER_TIME = '- **Time:** <local time+offset>';
+const normalize = (rows) => rows.map((line) => (
+  /^- \*\*Time:\*\* /.test(line) ? PLACEHOLDER_TIME : line
+));
+
 /** Rows of the four-backtick markdown block, with trailing whitespace normalised. */
 function sampleBlock(file) {
   const text = readFileSync(path.join(root, file), 'utf8');
   const match = text.match(/^````markdown\n([\s\S]*?)^````/m);
   assert.ok(match, `${file} has no fenced sample block`);
-  const rows = match[1].split('\n').map((line) => line.replace(/\s+$/, ''));
+  const rows = normalize(match[1].split('\n').map((line) => line.replace(/\s+$/, '')));
   while (rows.length > 0 && rows[rows.length - 1] === '') rows.pop();
   return rows;
 }
 
-const rendered = sampleMarkdown().split('\n').map((line) => line.replace(/\s+$/, ''));
+const rendered = normalize(sampleMarkdown().split('\n').map((line) => line.replace(/\s+$/, '')));
 while (rendered.length > 0 && rendered[rendered.length - 1] === '') rendered.pop();
 
 for (const file of ['README.md', 'README.zh.md']) {

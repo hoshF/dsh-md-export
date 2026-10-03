@@ -19,6 +19,22 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.7.1]
+
+### Added
+
+- **A test guards the published output sample.** The first draft of that sample had
+  been hand-wrapped, so it was not the renderer's output despite claiming to be.
+  `test/readme.test.mjs` renders `test/sample.mjs` and compares the result to the
+  block in both READMEs, reporting the first differing line rather than a wall of
+  diff. An intentional change to the output therefore has to update the
+  documentation; an accidental one fails the build instead of quietly making the
+  README false. The suite is 42 tests.
+
+  The comparison normalises the `**Time:**` row, which `formatLocalTime` formats in
+  the machine's own timezone — CI runs in UTC and a laptop does not, which is how
+  the first version of this test failed on all three Node versions.
+
 ## [1.7.0]
 
 ### Changed
@@ -50,12 +66,6 @@ downstream tooling may parse it.
   The sample is annotated to point out the four behaviours it demonstrates
   (heading demotion, user-side URLs excluded from References, tracking parameters
   stripped, thinking and tool calls being opt-in).
-- **A test now guards the published sample.** The first draft of it had been
-  hand-wrapped, so it was not the renderer's output despite saying so.
-  `test/readme.test.mjs` renders `test/sample.mjs` and compares the result to the
-  block in both READMEs, reporting the first differing line. An intentional change
-  to the output therefore has to update the documentation, and an accidental one
-  fails the build instead of quietly making the README false. The suite is 42 tests.
 
 ## [1.6.1]
 
