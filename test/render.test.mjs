@@ -80,7 +80,7 @@ test('injected user-side messages stay out unless requested', () => {
   assert.doesNotMatch(render().markdown, /INJECTED-CONTEXT-MARKER/);
   const withInjected = render({ injected: true }).markdown;
   assert.match(withInjected, /INJECTED-CONTEXT-MARKER/);
-  assert.match(withInjected, /注入消息 · runtime-context/);
+  assert.match(withInjected, /\(Injected · runtime-context\)/);
 });
 
 test('thinking and tool calls are opt-in and fold into the assistant message', () => {
@@ -141,7 +141,7 @@ test('v0: a tool result matches its call instead of becoming an orphan', () => {
 
   assert.equal(records.length, 2, 'expected exactly one record per tool call');
   assert.equal(
-    records.filter((record) => record.name === '（未匹配的工具结果）').length,
+    records.filter((record) => record.name === '(unmatched tool result)').length,
     0,
     'a v0 result failed to match its call, which duplicates every tool in the export',
   );

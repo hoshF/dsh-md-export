@@ -7,6 +7,8 @@
  *                        可选 #### 🤔 Thought Process + #### 💡 Response
  *   ### References     —— 按归一化 URL 去重，按首次出现编号
  *
+ * 文档标签一律英文，与骨架保持一致；界面文案才跟随 App 语言（见 lib/client.js）。
+ *
  * 两条贯穿全文的规则：
  *   1. 正文里的 `# 标题` 降级为 `**加粗**`（围栏感知），保证正文永远压不过文档大纲。
  *   2. 引用按「首次出现顺序」编号；URL 先归一化（去 hash、去追踪参数、去尾斜杠）再去重。
@@ -313,7 +315,7 @@ export function buildTurns(events, opts = {}) {
             record.result = body;
             record.isError = isError;
           } else {
-            ensure().tools.push({ name: '（未匹配的工具结果）', arguments: '', result: body, isError });
+            ensure().tools.push({ name: '(unmatched tool result)', arguments: '', result: body, isError });
           }
         }
         // web 检索结果里的信源同样计入 References（对应规范的 SEARCH 片段语义）
@@ -382,12 +384,12 @@ export function renderMarkdown({ header, events }, opts = {}, meta = {}) {
 
     if (opts.injected) {
       for (const item of turn.injected) {
-        out.push(`**（注入消息 · ${item.kind}）**`, '', stripHashes(item.text), '');
+        out.push(`**(Injected · ${item.kind})**`, '', stripHashes(item.text), '');
       }
     }
     if (opts.system) {
       for (const text of turn.system) {
-        out.push('**（系统提示词）**', '', stripHashes(text), '');
+        out.push('**(System prompt)**', '', stripHashes(text), '');
       }
     }
 
@@ -408,18 +410,18 @@ export function renderMarkdown({ header, events }, opts = {}, meta = {}) {
     }
 
     if (opts.tools && turn.tools.length > 0) {
-      out.push(`<details><summary>工具调用（${turn.tools.length}）</summary>`, '');
+      out.push(`<details><summary>Tool calls (${turn.tools.length})</summary>`, '');
       turn.tools.forEach((tool, n) => {
         out.push(`##### ${n + 1}. \`${tool.name}\``, '');
         if (tool.arguments) out.push(fence(tool.arguments, 'json'), '');
         if (tool.result !== null) {
-          out.push(tool.isError ? '**结果（错误）**' : '**结果**', '', fence(tool.result), '');
+          out.push(tool.isError ? '**Result (error)**' : '**Result**', '', fence(tool.result), '');
         }
       });
       out.push('</details>', '');
     }
 
-    if (turn.aborted) out.push('> ⚠️ 本轮被中止', '');
+    if (turn.aborted) out.push('> ⚠️ This turn was interrupted', '');
   }
 
   out.push(...refs.render());

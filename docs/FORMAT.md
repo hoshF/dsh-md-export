@@ -151,7 +151,7 @@ The call id is resolved from `message.toolCallId`, then the wrapper block's
 `toolCallId`, then `message.source.callId`; `isError` from either level. Reading
 only the v4 shape does not crash — which is what makes it dangerous. Every result
 fails to match its call, so the document lists each tool twice, once with its
-body missing and once as `（未匹配的工具结果）`, and the error flag and any search
+body missing and once as `(unmatched tool result)`, and the error flag and any search
 sources are lost along with it.
 
 ## Everything else is optional
