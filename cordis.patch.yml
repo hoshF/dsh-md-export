@@ -1,0 +1,5 @@
+# md-export bundle layer：插入一行宿主插件。行 id 保持稳定，便于重复安装
+# 与 profile patch 定向覆盖。
+- insert:
+    - id: md-export
+      name: dsh-md-export

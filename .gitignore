@@ -1,0 +1,8 @@
+# 构建产物：install.sh 用 pnpm pack 重新生成
+dist/
+
+# 本地安装的依赖（本仓库本身零依赖，仅以防万一）
+node_modules/
+
+# macOS
+.DS_Store
