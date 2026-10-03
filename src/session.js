@@ -3,7 +3,7 @@
  *
  * DSH 往会话日志里按帧追加 zstd 数据，所以一个 `.zstd` 文件往往是几百个
  * **拼接的 zstd 帧**。Node 的 `zstdDecompressSync` 只解第一帧，流式 API 遇到
- * 第二帧会报 "Unknown frame descriptor"，因此这里自行扫帧边界逐帧解压。
+ * 第二帧会报 "Unknown frame descriptor"，因此这里先检查完整帧结构，再逐帧解压。
  *
  * `node:zlib` 的 zstd API 并非所有 Node 都有（22.15 / 23.8 起才有，20 与 21 完全
  * 没有）。所以这里按命名空间导入再做运行时判断，而不是具名导入——具名导入在
@@ -18,7 +18,6 @@ import * as zlib from 'node:zlib';
 
 const DSH_HOME = process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh');
 const SESSIONS_ROOT = path.join(DSH_HOME, 'sessions');
-const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
 
 /** `node:zlib` 是否提供 zstd。 */
 export function hasZstdSupport() {
@@ -107,39 +106,75 @@ export function findSessionFile(sessionId) {
 }
 
 /**
+ * 按公开的 Zstandard 格式计算一个完整帧的末尾，不搜索负载里的 magic。
+ * Node 22 / 早期 24 的解压器会接受不完整输入，不能只靠解压成功判断完整性。
+ * https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md
+ */
+function zstdFrameEnd(buffer, start) {
+  let cursor = start;
+  const take = (bytes) => {
+    const position = cursor;
+    cursor += bytes;
+    if (cursor > buffer.length) throw new Error('zstd 帧不完整');
+    return position;
+  };
+
+  const magic = buffer.readUInt32LE(take(4));
+  // 标准里的 skippable 帧只携带元信息；仍须验证声明的负载已经写完。
+  if (magic >= 0x184d2a50 && magic <= 0x184d2a5f) {
+    const bytes = buffer.readUInt32LE(take(4));
+    take(bytes);
+    return cursor;
+  }
+  if (magic !== 0xfd2fb528) throw new Error('zstd 帧 magic 无效');
+
+  const descriptor = buffer[take(1)];
+  if (descriptor & 0x08) throw new Error('zstd 帧头使用了保留位');
+  const singleSegment = Boolean(descriptor & 0x20);
+  const contentSizeBytes = [singleSegment ? 1 : 0, 2, 4, 8][descriptor >>> 6];
+  const dictionaryBytes = [0, 1, 2, 4][descriptor & 3];
+  take(Number(!singleSegment) + dictionaryBytes + contentSizeBytes);
+
+  for (;;) {
+    const header = buffer.readUIntLE(take(3), 3);
+    const type = (header >>> 1) & 3;
+    if (type === 3) throw new Error('zstd 数据块使用了保留类型');
+    // RLE 的负载始终只有一个字节；其余类型的大小表示实际负载字节数。
+    take(type === 1 ? 1 : header >>> 3);
+    if (header & 1) break;
+  }
+  if (descriptor & 0x04) take(4);
+  return cursor;
+}
+
+/**
  * 解压一串拼接的 zstd 帧。
  * @param {Buffer} buf
  * @returns {Buffer}
  */
 export function decompressZstdAll(buf) {
-  // 必须在重试循环之外先判：循环里的 catch 会把"没有 zstd 支持"一并吞掉，
-  // 最后抛出误导性的"帧边界解析失败"。
+  // 先判运行时支持，避免把缺少 zstd API 误报成日志损坏。
   if (!hasZstdSupport()) throw zstdUnavailable();
-
-  const offsets = [];
-  for (let i = buf.indexOf(MAGIC); i !== -1; i = buf.indexOf(MAGIC, i + 4)) offsets.push(i);
-  if (offsets.length === 0 || offsets[0] !== 0) return zstdDecompress(buf);
 
   const parts = [];
   let start = 0;
-  let cursor = 1;
-  while (start < buf.length) {
-    let advanced = false;
-    for (let j = Math.max(cursor, 1); j <= offsets.length; j++) {
-      const end = j < offsets.length ? offsets[j] : buf.length;
-      if (end <= start) continue;
-      try {
-        parts.push(zstdDecompress(buf.subarray(start, end)));
-        start = end;
-        cursor = j + 1;
-        advanced = true;
-        break;
-      } catch {
-        // 边界不对（帧内出现了伪造 magic），向后扩展重试
-      }
+  do {
+    let decoded;
+    let end;
+    try {
+      end = zstdFrameEnd(buf, start);
+      // 每次只交给解压器一个完整帧；subarray 不复制输入。
+      decoded = zlib.zstdDecompressSync(buf.subarray(start, end), { info: true });
+    } catch (error) {
+      throw new Error(`zstd 帧解压失败（字节偏移 ${start}；日志可能损坏或正在写入，请重试）`, { cause: error });
     }
-    if (!advanced) throw new Error('zstd 帧边界解析失败（日志可能正在写入，请重试）');
-  }
+    const consumed = decoded.engine.bytesWritten;
+    if (consumed !== end - start) {
+      throw new Error(`zstd 解压器未报告有效帧长度（字节偏移 ${start}）`);
+    }
+    parts.push(decoded.buffer);
+    start = end;
+  } while (start < buf.length);
   return Buffer.concat(parts);
 }
 

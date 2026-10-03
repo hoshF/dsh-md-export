@@ -33,9 +33,15 @@ Decoding only the first frame yields the session header and **0.004%** of the
 content, silently. Node's streaming API does not help — it throws
 `Unknown frame descriptor` on the second frame.
 
-`decompressZstdAll()` in `src/session.js` locates frame boundaries by scanning
-for the zstd magic (`28 B5 2F FD`) and decompresses each frame separately,
-extending the boundary when a candidate slice fails to decode.
+`decompressZstdAll()` in `src/session.js` first checks each frame's header, block
+boundaries and optional checksum length against the public Zstandard layout.
+It then decompresses that complete frame with `zstdDecompressSync(input, { info: true })`
+and verifies actual input consumption (`engine.bytesWritten`). The structural
+check is needed because Node 22 and early Node 24 can accept incomplete input
+without throwing. Magic bytes inside a frame do not create a false boundary.
+Every input byte must be consumed by a complete frame;
+corrupt frames, incomplete tails and trailing garbage fail the whole export
+instead of returning a successful partial transcript.
 
 **Any code that touches these files must go through that function.**
 
@@ -170,6 +176,7 @@ three shapes above will not.
 |---|---|
 | unknown event type | ignored |
 | unparsable JSON line | skipped |
+| corrupt/truncated zstd frame or trailing garbage | hard error; retry if the log is being written |
 | no `{type:"session"}` header in any frame | hard error, surfaced as HTTP 500 |
 | session `version` outside 0–4 | no gate; rows are parsed by shape |
 

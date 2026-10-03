@@ -12,7 +12,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -52,6 +52,20 @@ writeSession(home, {
     data: { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'untitled' }] },
   }],
 });
+
+const EMOJI_ID = 'session-fixture-emoji-limit';
+writeSession(home, {
+  sessionId: EMOJI_ID,
+  events: [{ type: 'session/title', data: { title: `${'a'.repeat(79)}😀` } }],
+});
+
+const CORRUPT_ID = 'session-fixture-corrupt-frame';
+const { file: corruptFile } = writeSession(home, { sessionId: CORRUPT_ID });
+const corruptBytes = readFileSync(corruptFile);
+const secondFrame = corruptBytes.indexOf(Buffer.from([0x28, 0xb5, 0x2f, 0xfd]), 4);
+assert.ok(secondFrame > 0);
+corruptBytes[secondFrame] ^= 1;
+writeFileSync(corruptFile, corruptBytes);
 
 process.env.DSH_HOME = home;
 const { createMdExportHandler, MD_EXPORT_PATH } = await import('../src/index.js');
@@ -114,6 +128,13 @@ test('a non-ASCII title keeps a usable ASCII fallback filename', async () => {
   );
 });
 
+test('a title crossing the filename limit with an emoji still exports successfully', async () => {
+  const response = await fetch(`${base}${MD_EXPORT_PATH}?sessionId=${EMOJI_ID}`);
+  assert.equal(response.status, 200);
+  assert.equal(decodeURIComponent(response.headers.get('x-dsh-filename')), `${'a'.repeat(79)}.md`);
+  assert.match(await response.text(), /^## Metadata/m);
+});
+
 test('meta=1 returns a lightweight JSON payload carrying the filename', async () => {
   const response = await fetch(`${base}${MD_EXPORT_PATH}?meta=1&sessionId=${SESSION_ID}`);
   assert.equal(response.status, 200);
@@ -153,6 +174,12 @@ test('an unknown session yields 404', async () => {
   const response = await fetch(`${base}${MD_EXPORT_PATH}?sessionId=session-nope`);
   assert.equal(response.status, 404);
   assert.match(await response.text(), /session log not found/);
+});
+
+test('a corrupted later frame fails instead of returning a successful partial export', async () => {
+  const response = await fetch(`${base}${MD_EXPORT_PATH}?sessionId=${CORRUPT_ID}`);
+  assert.equal(response.status, 500);
+  assert.match(await response.text(), /markdown export failed/);
 });
 
 test('a missing sessionId yields 400', async () => {

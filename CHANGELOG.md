@@ -19,6 +19,36 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [Unreleased]
+
+## [1.7.2] - 2026-10-03
+
+### Fixed
+
+- Reject corrupt or truncated zstd frames and trailing garbage instead of silently
+  skipping content; validate complete frame boundaries and the decoder's input
+  consumption.
+- Preserve consecutive blank lines in message code blocks and tool arguments/results.
+- Keep Unicode surrogate pairs intact when truncating title-based filenames.
+- Exclude sentence punctuation from bare references and number mixed bare/Markdown
+  links by their actual first appearance, retaining labelled duplicates.
+- Cancel stale saved-state timers and prevent overlapping exports or UI updates
+  after unmount; cancellation and failures allow retrying.
+- Reject missing CLI output paths before writing files, and list all sessions
+  instead of silently stopping at 40.
+- Remove misleading pre-v3 warnings from the CLI and manual smoke script. Earlier
+  changelog statements that these warnings never existed have been corrected.
+
+### Added
+
+- Compression integrity, content-preservation, Unicode filename, reference,
+  client lifecycle and CLI regression tests; all `test/*.test.mjs` files run in CI.
+
+### Documentation
+
+- Synchronise both READMEs and the format contract with strict frame decoding,
+  filename refresh timing, whitespace preservation and CLI argument handling.
+
 ## [1.7.1]
 
 ### Added
@@ -52,8 +82,9 @@ downstream tooling may parse it.
 
 - **The README claimed things that were not true.** The support matrix listed
   session formats as "v3 and v4", with v0–v2 described as emitting a warning and
-  an incomplete export — no such warning has ever existed, and v0, v3 and v4 are all
-  supported (see 1.6.1). It also described the CI matrix as Node 20/22/24 when it
+  an incomplete export — the renderer and HTTP route did not emit that warning,
+  while the CLI and manual smoke script retained it until the 1.7.2 fixes.
+  v0, v3 and v4 are all supported (see 1.6.1). It also described the CI matrix as Node 20/22/24 when it
   is 22.15/24/26, and described the filename prefetch as happening at mount when
   the click now refetches it.
 
@@ -93,7 +124,8 @@ downstream tooling may parse it.
 ### Changed
 
 - `docs/FORMAT.md` had both of these wrong. It promised a stderr warning and an
-  "incomplete" mark for `version < 3` that the code has never emitted, and it
+  "incomplete" mark for `version < 3` that the renderer never emitted (the CLI and
+  manual smoke warnings were removed in 1.7.2), and it
   asserted that v0–v2 kept message content only in chunk rows. Real v0 logs carry
   the finalized rows as well, so no such warning was ever needed. The document now
   states the actual policy — no version gate, rows dispatched by shape — and

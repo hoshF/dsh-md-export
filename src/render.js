@@ -198,26 +198,32 @@ class ReferenceCollector {
 /** 引号内联链接：[标签](url)。标签长度设上限，避免把整段文本当标签回溯。 */
 const MARKDOWN_LINK = /\[([^\]]{0,300})\]\((https?:\/\/[^)\s]+)\)/g;
 /** 裸 URL，前面不能紧跟 ( < 或词字符（否则它多半是某个标记的一部分）。 */
-const BARE_URL = /(?<![(<\w])(https?:\/\/[^\s<>()"']+)/g;
+const BARE_URL = /(?<![(<\w])(https?:\/\/[^\s<>()"'，。；：！？、…“”‘’《》【】]+)/g;
 
 /**
  * 从一段 Markdown 文本里抽出链接并登记为引用。
  *
- * 先收集 `[标签](url)`，再把它们的区间从文本里抹掉，最后在剩余文本里找裸 URL。
+ * 先定位 `[标签](url)` 并抹除其区间，再找裸 URL；两类匹配按原文位置合并登记。
  * 早先这里用「匹配位置是否落在某个链接起始点之后 400 字符内」来近似判断，
  * 长标签或同段落多个链接都会判错；抹除区间是精确的，也不再需要魔法窗口。
  */
 function collectLinks(text, refs) {
   if (!text) return;
 
+  const links = [];
   let masked = text;
   for (const match of text.matchAll(MARKDOWN_LINK)) {
-    refs.add(match[1], match[2]);
+    links.push({ index: match.index, title: match[1], url: match[2] });
     const start = match.index;
     masked = masked.slice(0, start) + ' '.repeat(match[0].length) + masked.slice(start + match[0].length);
   }
 
-  for (const match of masked.matchAll(BARE_URL)) refs.add('', match[1]);
+  for (const match of masked.matchAll(BARE_URL)) {
+    // 裸链接末尾的句子标点不属于目标地址；显式 Markdown 目标不做这个猜测。
+    links.push({ index: match.index, title: '', url: match[1].replace(/[.,;:!?]+$/, '') });
+  }
+  links.sort((a, b) => a.index - b.index);
+  for (const link of links) refs.add(link.title, link.url);
 }
 
 // ------------------------------------------------------------------ 事件 → 轮次
@@ -427,7 +433,8 @@ export function renderMarkdown({ header, events }, opts = {}, meta = {}) {
   out.push(...refs.render());
 
   return {
-    markdown: `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`,
+    // 结构间距由上面的空行负责；全局压缩会改写正文及工具围栏里的内容。
+    markdown: `${out.join('\n').trimEnd()}\n`,
     turnCount: real.length,
     referenceCount: refs.size,
     title,
@@ -466,6 +473,8 @@ export function markdownFilename(header, title) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, MAX_FILENAME_STEM)
+    // 保持原来的长度上限，但不能留下被截断的 emoji 高位代理项。
+    .replace(/[\uD800-\uDBFF]$/, '')
     .replace(/[.\s]+$/, '')
     .trim();
   return cleaned ? `${cleaned}.md` : fallbackMarkdownFilename(header?.id);

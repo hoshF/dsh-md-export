@@ -90,6 +90,14 @@ test('markdownFilename sanitises illegal characters and length', () => {
   assert.equal(markdownFilename(header, 'x'.repeat(120)), `${'x'.repeat(80)}.md`);
 });
 
+test('markdownFilename never splits an emoji at its length limit', () => {
+  const header = { id: 'session-unicode' };
+  const overflow = markdownFilename(header, `${'a'.repeat(79)}😀`);
+  assert.doesNotThrow(() => encodeURIComponent(overflow));
+  assert.equal(overflow, `${'a'.repeat(79)}.md`);
+  assert.equal(markdownFilename(header, `${'a'.repeat(78)}😀`), `${'a'.repeat(78)}😀.md`);
+});
+
 test('markdownFilename falls back to a short id', () => {
   const header = { id: 'session-abc12345' };
   assert.equal(markdownFilename(header, null), 'dsh-abc12345.md');

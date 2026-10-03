@@ -84,7 +84,15 @@ function parseArgs(argv) {
       case '--stdout': opts.stdout = true; break;
       case '--list': opts.list = true; break;
       case '--latest': break;
-      case '-o': case '--out': opts.out = argv[++i]; break;
+      case '-o': case '--out': {
+        const output = argv[i + 1];
+        if (!output || output.startsWith('-')) {
+          throw new Error(`${a} requires an output path; use ./ for filenames beginning with '-'`);
+        }
+        opts.out = output;
+        i++;
+        break;
+      }
       case '-h': case '--help': opts.help = true; break;
       default:
         if (a.startsWith('-')) throw new Error(`unknown option: ${a}`);
@@ -102,7 +110,7 @@ function main() {
     const sessions = listSessions();
     if (sessions.length === 0) { process.stdout.write('No sessions found.\n'); return 0; }
     process.stdout.write(`${sessions.length} session(s), newest first:\n\n`);
-    for (const s of sessions.slice(0, 40)) {
+    for (const s of sessions) {
       process.stdout.write(`  ${new Date(s.mtime).toISOString().slice(0, 19).replace('T', ' ')}  ${s.id}  (v${s.gen})\n`);
     }
     return 0;
@@ -121,10 +129,6 @@ function main() {
 
   const log = readSessionLog(file);
   if (!log.header) throw new Error(`session log has no header: ${file}`);
-  if (log.version < 3) {
-    process.stderr.write(`warning: session format v${log.version} (chunk-row layout); export may be incomplete.\n`);
-  }
-
   const origin = process.env.DSH_WEB_URL ?? null;
   const { markdown, turnCount, referenceCount, title } = renderMarkdown(log, opts, { origin });
 

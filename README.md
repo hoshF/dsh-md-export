@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2022.15-informational" alt="Node 22.15+">
   <img src="https://img.shields.io/badge/DSH-0.2.x-informational" alt="DSH 0.2.x">
-  <img src="https://img.shields.io/badge/session%20formats-v0%E2%80%93v4-informational" alt="Session formats v0-v4">
+  <img src="https://img.shields.io/badge/session%20formats-v0%2Fv3%2Fv4-informational" alt="Verified session formats v0/v3/v4">
 </p>
 
 <p align="center">
@@ -110,13 +110,13 @@ Four things that sample is quietly demonstrating:
 ## Features
 
 - **One click, one file.** The button lives in the session header. `showSaveFilePicker()`
-  opens the OS dialog on the click itself, and the suggested filename is the
-  conversation title — `Refactoring the parser.md`, not `export-1738.md`.
+  opens the OS dialog after a filename refresh bounded to two seconds. The
+  suggested filename is the conversation title — `Refactoring the parser.md`.
 - **Conventional Markdown.** `## Metadata` → `## Conversation` → `### References`
   with emoji role headings and no H1, following the AfterChat / ChatFormat
   convention so existing export pipelines keep working. See
   [Output format](#output-format).
-- **Every session format DSH has written — v0 through v4.** That includes the
+- **Verified session formats — v0, v3 and v4.** That includes the
   multi-frame zstd container, which Node's one-shot decompressor cannot read.
 - **A CLI and an HTTP route, not just a button.** `bin/dsh-md-export.mjs` and
   `GET /api/md-export` run the same renderer, for scripting and for the UI.
@@ -198,8 +198,9 @@ the dependency and its bundle registration.
 
 The button sits in the session header's utilities slot. Its label follows the
 app's language setting — `Export MD` in English, `导出 MD` in Chinese — and a toast
-afterwards names the file that was written. Clicking opens the save dialog first
-and fetches the content second, so the dialog never waits on I/O.
+afterwards names the file that was written. Clicking refreshes the filename
+(up to two seconds), opens the save dialog, then fetches and writes the Markdown.
+Only one export can run at a time.
 
 The suggestion is the conversation title. You can rename it in the dialog; the
 toast reports the name that actually landed on disk.
@@ -214,6 +215,8 @@ node bin/dsh-md-export.mjs --all -o out.md        # tool calls, thinking, inject
 ```
 
 Defaults to `~/dsh-transcripts/<title>.md`. `--stdout` prints instead.
+`--list` lists every session. `-o` / `--out` requires a path; use `./-name.md`
+for a filename beginning with `-`. Invalid output arguments fail before any file is written.
 
 ### HTTP
 
@@ -237,12 +240,15 @@ Follows the AfterChat / ChatFormat conversation-export convention:
 | Metadata as a bullet list, bold keys, backticked values | No table to misalign. |
 | `### 🧑‍💻 User` / `### 🤖 Assistant`, no turn numbers, no `---` | Role headings carry the structure. |
 | `stripHashes()` on message bodies | `# Heading` → `**Heading**` (fence-aware, absorbing inner `**`), so message content can never outrank the document outline. |
+| Preserve blank lines in message bodies and tool fences | Exporting does not compress code or tool output whitespace. |
 | References deduped by normalised URL, numbered by first appearance | URLs lose their fragment, tracking parameters and trailing slash. Loopback addresses are excluded — they are debugging artifacts, not sources. |
 | Every label is English, including the ones this plugin adds | The skeleton is fixed English by convention, so a mixed-language document would be an accident, not a feature. UI copy is localised separately. |
 
 Thinking (`reasoning=1`) folds into the same assistant message as
 `#### 🤔 Thought Process` + `#### 💡 Response`. Tool calls (`tools=1`) are an
 addition of this plugin; the convention has no equivalent concept.
+Bare links exclude sentence-ending punctuation; explicit Markdown link targets
+retain their punctuation. Mixed bare and Markdown links share the same appearance order.
 
 ## Compatibility
 
@@ -268,17 +274,18 @@ is depended on, so a break can be diagnosed rather than guessed at.
 1. **Session logs are multi-frame zstd.** DSH appends one frame per flush, so a
    `.zstd` file routinely holds hundreds of independent frames. Node's
    `zstdDecompressSync` decodes only the first one, and the streaming API throws
-   `Unknown frame descriptor` on the second. `src/session.js` scans frame
-   boundaries itself and decompresses each frame.
+   `Unknown frame descriptor` on the second. `src/session.js` advances by the
+   decoder's actual consumed byte count for each frame. Corrupt or truncated
+   frames and trailing garbage cause an error instead of a partial success.
 2. **The finalised rows are complete, so the streaming ones are ignored.** Old
    formats also wrote a fine-grained copy of every token (`reasoning-chunks`,
    `text-chunks`, `tool-call-chunks`); reading both would double the transcript.
    Measured against real v0 logs, nothing is lost by skipping them.
-3. **Save dialog first, content second.** `showSaveFilePicker()` requires
-   transient user activation. Awaiting a network request first can void it, so the
-   client takes the file handle before anything else — then fetches, then writes.
+3. **Filename, save dialog, content.** `showSaveFilePicker()` requires
+   transient user activation, so the metadata refresh before it is bounded to
+   two seconds. After picking a file, the client fetches the Markdown and writes it.
    When the host lacks the API it falls back to an ordinary download.
-4. **The filename must be known before the click.** That is the only reason the
+4. **The filename is refreshed on each click.** That is the reason the
    `meta=1` endpoint exists. The click refetches it (bounded by a timeout) rather
    than trusting a snapshot taken at mount, because a new conversation has no
    title yet at that point.
@@ -303,7 +310,9 @@ npm run test:smoke              # against the newest real session
 node test/smoke-real-session.mjs <sessionId>
 ```
 
-42 tests run on Node 22.15, 24 and 26 in CI. See
+The hermetic suite runs on Node 22.15, 24 and 26 in CI, including compression
+integrity, Markdown rendering, HTTP routes, CLI child processes and simulated
+client save interactions. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the two hard constraints — no build step,
 clean-room implementation — before sending a patch.
 
@@ -319,6 +328,9 @@ clean-room implementation — before sending a patch.
 | `cordis.patch.yml` | Bundle patch that inserts the host plugin row |
 | `docs/FORMAT.md` | The session-log format contract we depend on |
 | `test/fixtures.mjs` | Synthetic session logs, including a deliberate multi-frame layout |
+| `test/session.test.mjs` | Multi-frame decoding and corrupt/truncated input rejection |
+| `test/client.test.mjs` | Save lifecycle, cancellation, fallback and repeated-click behaviour |
+| `test/cli.test.mjs` | CLI arguments, output files, complete listing and legacy logs |
 | `test/render.test.mjs` | Event stream → Markdown behaviour, including v0 tool results |
 | `test/host.test.mjs` | Route tests, including trust-fence cases |
 | `test/format.test.mjs` | Pure formatting helpers |

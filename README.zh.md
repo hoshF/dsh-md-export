@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="许可：MIT"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2022.15-informational" alt="Node 22.15+">
   <img src="https://img.shields.io/badge/DSH-0.2.x-informational" alt="DSH 0.2.x">
-  <img src="https://img.shields.io/badge/session%20formats-v0%E2%80%93v4-informational" alt="会话格式 v0–v4">
+  <img src="https://img.shields.io/badge/session%20formats-v0%2Fv3%2Fv4-informational" alt="已验证的会话格式 v0/v3/v4">
 </p>
 
 <p align="center">
@@ -102,9 +102,9 @@ Roll back with `make rollback TAG=<previous>`. The checklist is at https://examp
 
 ## 特性
 
-- **一次点击，一个文件。** 按钮位于会话标题栏。`showSaveFilePicker()` 在点击的瞬间弹出系统窗口，建议文件名就是对话标题——是 `重构解析器.md`，不是 `export-1738.md`。
+- **一次点击，一个文件。** 按钮位于会话标题栏。先刷新文件名（最多两秒），再弹出系统保存窗口；建议文件名就是对话标题——是 `重构解析器.md`，不是 `export-1738.md`。
 - **符合约定的 Markdown。** `## Metadata` → `## Conversation` → `### References`，emoji 角色标题、没有 H1，沿用 AfterChat / ChatFormat 的对话导出约定，既有的导出流水线可以照用。详见[输出格式](#输出格式)。
-- **DSH 写过的每一种会话格式——v0 到 v4。** 包括多帧 zstd 容器，而 Node 的一次性解压 API 读不了它。
+- **已验证的会话格式——v0、v3 和 v4。** 包括多帧 zstd 容器，而 Node 的一次性解压 API 读不了它。
 - **不只是按钮，还有命令行与 HTTP 路由。** `bin/dsh-md-export.mjs` 与 `GET /api/md-export` 跑的是同一个渲染器，便于脚本化。
 - **零依赖、无构建步骤。** 只用 Node 内置模块与相对路径文件，因此没有版本闸门能拒绝它，App 也能直接从 git 地址安装。
 - **它会告诉你发生了什么。** 文案跟随 App 的语言设置（中/英），保存后弹出横幅写明实际写入的文件名——失败时则显示原因。
@@ -162,7 +162,7 @@ git clone https://github.com/hoshF/dsh-md-export.git && cd dsh-md-export
 
 ### 界面内
 
-按钮位于会话标题栏的 utilities 插槽。文案跟随 App 的语言设置——英文显示 `Export MD`，中文显示 `导出 MD`；保存完成后弹出横幅，写明实际写入的文件名。点击后**先弹保存框、再取内容**，所以保存框不会等待 I/O。
+按钮位于会话标题栏的 utilities 插槽。文案跟随 App 的语言设置——英文显示 `Export MD`，中文显示 `导出 MD`；保存完成后弹出横幅，写明实际写入的文件名。点击后先刷新文件名（最多两秒），再弹保存框，最后获取并写入 Markdown。同一时间只运行一次导出。
 
 建议文件名就是对话标题，你可以在保存框里改名；横幅报告的是**真正落盘**的那个名字。
 
@@ -176,6 +176,7 @@ node bin/dsh-md-export.mjs --all -o out.md        # 含工具调用、思考、�
 ```
 
 默认写到 `~/dsh-transcripts/<标题>.md`；`--stdout` 则直接打印。
+`--list` 列出全部会话。`-o` / `--out` 必须跟输出路径；文件名以 `-` 开头时写成 `./-name.md`。参数无效时会在写文件前报错。
 
 ### HTTP
 
@@ -197,10 +198,12 @@ POST /api/md-export   {"sessionId":"…","tools":true,…}
 | 元信息用项目符号列表，键加粗、值加反引号 | 没有表格，就不会错位。 |
 | `### 🧑‍💻 User` / `### 🤖 Assistant`，无轮次编号、无 `---` | 结构由角色标题承担。 |
 | 正文过 `stripHashes()` | `# 标题` → `**标题**`（围栏感知，并吸收内层 `**`），因此正文永远压不过文档大纲。 |
+| 保留正文与工具围栏中的空行 | 导出不会压缩代码或工具输出的空白。 |
 | 引用按归一化 URL 去重，按首次出现编号 | URL 先去掉片段、追踪参数与尾斜杠。loopback 地址被排除——它们是调试产物，不是信源。 |
 | 所有标签都是英文，包括本插件新增的 | 骨架按约定固定为英文，中英混杂是事故而不是特性。界面文案另行本地化。 |
 
 思考（`reasoning=1`）会折叠进同一条助手消息，标为 `#### 🤔 Thought Process` + `#### 💡 Response`。工具调用（`tools=1`）是本插件对 DSH 的补充，该约定里没有对应概念。
+裸链接排除句末标点；显式 Markdown 链接目标保留自身标点。两类链接混用时仍按原文首次出现顺序编号。
 
 ## 兼容性
 
@@ -218,10 +221,10 @@ POST /api/md-export   {"sessionId":"…","tools":true,…}
 
 ## 实现要点
 
-1. **会话日志是多帧 zstd。** DSH 每次 flush 追加一帧，所以一个 `.zstd` 文件常有数百个独立帧。Node 的 `zstdDecompressSync` 只解第一帧，流式 API 在第二帧抛 `Unknown frame descriptor`。`src/session.js` 自行扫描帧边界并逐帧解压。
+1. **会话日志是多帧 zstd。** DSH 每次 flush 追加一帧，所以一个 `.zstd` 文件常有数百个独立帧。Node 的 `zstdDecompressSync` 只解第一帧，流式 API 在第二帧抛 `Unknown frame descriptor`。`src/session.js` 按解压器实际消耗的字节数逐帧推进。损坏、截断或尾部垃圾会报错，不会以成功状态返回部分内容。
 2. **定稿行是完整的，所以流式行被忽略。** 老格式另外写了一份逐 token 的细粒度副本（`reasoning-chunks`、`text-chunks`、`tool-call-chunks`）；两套都读会让对话翻倍。实测真实 v0 日志，跳过它们不丢内容。
-3. **先弹保存框，再取内容。** `showSaveFilePicker()` 要求瞬时用户激活。先 await 网络请求可能让激活过期，所以客户端先拿到文件句柄，再去取、再写入。宿主没有该 API 时回退为普通下载。
-4. **文件名必须在点击前就知道。** 这是 `meta=1` 端点存在的唯一原因。点击时会**重新取一次**（带超时上界），而不是信任挂载时的快照——因为新会话在挂载那一刻还没有标题。
+3. **文件名、保存框、正文。** `showSaveFilePicker()` 要求瞬时用户激活，因此之前的元信息刷新最多等待两秒。拿到文件句柄后，再获取 Markdown 并写入。宿主没有该 API 时回退为普通下载。
+4. **每次点击都刷新文件名。** 这是 `meta=1` 端点存在的原因。点击时会**重新取一次**（带超时上界），而不是信任挂载时的快照——因为新会话在挂载那一刻还没有标题。
 5. **没有 peer 依赖。** 插件的 import 只有 Node 内置模块与相对路径文件，因此不会有任何东西解析到版本不匹配的副本。
 
 ## 安全
@@ -238,7 +241,7 @@ npm run test:smoke              # 针对最新的真实会话
 node test/smoke-real-session.mjs <sessionId>
 ```
 
-CI 在 Node 22.15、24、26 上跑 42 条测试。提交补丁前请先看 [CONTRIBUTING.md](CONTRIBUTING.md) 里的两条硬约束——无构建步骤、净室实现。
+CI 在 Node 22.15、24、26 上运行自足测试，覆盖压缩完整性、Markdown 渲染、HTTP 路由、CLI 子进程和模拟客户端保存交互。提交补丁前请先看 [CONTRIBUTING.md](CONTRIBUTING.md) 里的两条硬约束——无构建步骤、净室实现。
 
 ## 项目结构
 
@@ -252,6 +255,9 @@ CI 在 Node 22.15、24、26 上跑 42 条测试。提交补丁前请先看 [CONT
 | `cordis.patch.yml` | 把宿主插件行插入 bundle 的补丁 |
 | `docs/FORMAT.md` | 我们所依赖的会话日志格式契约 |
 | `test/fixtures.mjs` | 合成会话日志，含刻意构造的多帧布局 |
+| `test/session.test.mjs` | 多帧读取与损坏、截断输入的拒绝 |
+| `test/client.test.mjs` | 保存生命周期、取消、回退与重复点击 |
+| `test/cli.test.mjs` | CLI 参数、输出文件、完整列表与旧格式日志 |
 | `test/render.test.mjs` | 事件流 → Markdown 行为，含 v0 工具结果 |
 | `test/host.test.mjs` | 路由测试，含信任围栏用例 |
 | `test/format.test.mjs` | 纯格式化辅助函数 |

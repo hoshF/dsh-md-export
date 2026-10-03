@@ -37,10 +37,6 @@ console.log(`session : ${sessionId}`);
 console.log(`file    : ${file.replace(process.env.HOME ?? '~', '~')}`);
 console.log(`format  : v${log.version}  ·  ${log.events.length} events`);
 
-if (log.version < 3) {
-  console.log('note    : pre-v3 chunk-row format; the export will be incomplete');
-}
-
 const { markdown, turnCount, referenceCount } = renderMarkdown(log, {}, { origin: null });
 console.log(`render  : ${turnCount} turns, ${referenceCount} references, ${markdown.length} chars`);
 console.log(`starts  : ${JSON.stringify(markdown.split('\n')[0])}`);

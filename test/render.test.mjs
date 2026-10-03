@@ -103,6 +103,31 @@ test('headings inside message bodies are demoted, fenced text is untouched', () 
   assert.match(markdown, /^echo "# 也不是标题"$/m);
 });
 
+test('rendering preserves consecutive blank lines in user and assistant code blocks', () => {
+  const code = ['```text', 'first', '', '', '', 'last', '```'].join('\n');
+  const events = [
+    { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: code }] } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: code }] } } },
+  ];
+  const { markdown } = renderMarkdown({ header: log.header, events });
+  assert.equal(markdown.split(code).length - 1, 2, 'code block whitespace was rewritten');
+});
+
+test('rendering preserves consecutive blank lines in tool arguments and results', () => {
+  const argumentsText = '{\n\n\n"command": "example"\n}';
+  const resultText = 'first\n\n\n\nlast';
+  const events = [
+    { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'run' }] } },
+    { type: 'assistant/message', data: { message: { content: [
+      { type: 'tool-call', id: 'whitespace-call', name: 'bash', arguments: argumentsText },
+    ] } } },
+    { type: 'tool/result', data: { message: { toolCallId: 'whitespace-call', content: [{ type: 'text', text: resultText }] } } },
+  ];
+  const { markdown } = renderMarkdown({ header: log.header, events }, { tools: true });
+  assert.ok(markdown.includes(argumentsText), 'tool arguments whitespace was rewritten');
+  assert.ok(markdown.includes(resultText), 'tool result whitespace was rewritten');
+});
+
 test('references are normalized, deduplicated, and numbered by first appearance', () => {
   const { markdown, referenceCount } = render();
   assert.equal(referenceCount, 3);
@@ -125,6 +150,41 @@ test('loopback URLs and user-side links are not references', () => {
   assert.doesNotMatch(block, /user-side\.example\.com/);
   // …but the user's own text is still reproduced verbatim in the transcript
   assert.match(markdown, /user-side\.example\.com\/should-not-appear/);
+});
+
+const referenceExport = (text) => {
+  const events = [
+    { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'sources?' }] } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text }] } } },
+  ];
+  const { markdown } = renderMarkdown({ header: log.header, events });
+  return markdown.slice(markdown.indexOf('### References'));
+};
+
+test('mixed bare and Markdown links keep their first appearance order', () => {
+  const refs = referenceExport('First https://example.com/first then [Second](https://example.com/second).');
+  assert.match(refs, /- \[1\] \[https:\/\/example\.com\/first\]/);
+  assert.match(refs, /- \[2\] \[Second\]/);
+});
+
+test('a later labelled duplicate adds its title without changing its original position', () => {
+  const refs = referenceExport('https://example.com/first https://example.com/second [First](https://example.com/first?utm_source=chat)');
+  assert.match(refs, /- \[1\] \[First\]\(https:\/\/example\.com\/first\)/);
+  assert.match(refs, /- \[2\] \[https:\/\/example\.com\/second\]/);
+});
+
+test('bare references exclude English and Chinese sentence punctuation', () => {
+  const refs = referenceExport('See https://example.com/english. 另见 https://example.com/chinese。下一句。还有 https://example.com/query?q=one,two，结束。');
+  assert.match(refs, /\(https:\/\/example\.com\/english\)/);
+  assert.match(refs, /\(https:\/\/example\.com\/chinese\)/);
+  assert.match(refs, /\(https:\/\/example\.com\/query\?q=one%2Ctwo\)/);
+  assert.doesNotMatch(refs, /%E3%80%82|%EF%BC%8C|下一句/);
+});
+
+test('explicit Markdown destinations and encoded URL punctuation are preserved', () => {
+  const refs = referenceExport('[Exact](https://example.com/file.) and https://example.com/path%2E?q=why%3F.');
+  assert.match(refs, /\[Exact\]\(https:\/\/example\.com\/file\.\)/);
+  assert.match(refs, /\(https:\/\/example\.com\/path%2E\?q=why%3F\)/);
 });
 
 // ---------------------------------------------------------------- v0 形状
