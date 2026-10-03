@@ -19,6 +19,39 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.6.1]
+
+### Fixed
+
+- **Tool results in v0–v3 sessions never matched their calls.** Those formats wrap
+  a result in a `tool-result` block carrying the call id and the error flag one
+  level deeper than v4 does, and only the v4 shape was read. Nothing crashed,
+  which is what made it bad: every result failed to match, so each tool appeared
+  twice in the document — once with an empty body and once as
+  `（未匹配的工具结果）` — tool output was lost entirely, failed calls were
+  reported as successful, and search sources inside those results never reached
+  `### References`.
+
+  Measured on this machine before the fix: 4,552 results across 56 old-format
+  sessions, of which 4,552 were unmatched, 0% carried output and 0 carried an
+  error flag. After: 4,552 matched, 100% with output, 71 error flags, 0 orphans.
+
+- **A result arriving after the next user turn no longer goes unmatched.** The
+  call-id lookup tables were rebuilt on every user message, so a result written
+  later — a long-running tool, an approval flow — could not find its call. callIds
+  are unique within a session, so the tables now persist for the whole session.
+  This removed 32 stray unmatched entries from current-format sessions.
+
+### Changed
+
+- `docs/FORMAT.md` had both of these wrong. It promised a stderr warning and an
+  "incomplete" mark for `version < 3` that the code has never emitted, and it
+  asserted that v0–v2 kept message content only in chunk rows. Real v0 logs carry
+  the finalized rows as well, so no such warning was ever needed. The document now
+  states the actual policy — no version gate, rows dispatched by shape — and
+  records the one real gap: steps interrupted before a finalized message was
+  written, whose partial reasoning exists only as chunks.
+
 ## [1.6.0]
 
 ### Changed

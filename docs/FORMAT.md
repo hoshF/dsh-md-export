@@ -107,6 +107,9 @@ to match results).
 
 ### 3. Tool results
 
+Two shapes exist, and both must be handled. v4 flattens the result and keeps the
+call id on the message:
+
 ```json
 {
   "type": "tool/result",
@@ -120,6 +123,36 @@ to match results).
   }
 }
 ```
+
+v0–v3 wrap it in a `tool-result` block that carries the call id and the error
+flag one level deeper, with the body in that block's own `content`:
+
+```json
+{
+  "type": "tool/result",
+  "data": {
+    "message": {
+      "role": "user",
+      "source": { "kind": "tool", "callId": "call_…" },
+      "content": [
+        {
+          "type": "tool-result",
+          "toolCallId": "call_…",
+          "isError": false,
+          "content": [{ "type": "text", "text": "…" }]
+        }
+      ]
+    }
+  }
+}
+```
+
+The call id is resolved from `message.toolCallId`, then the wrapper block's
+`toolCallId`, then `message.source.callId`; `isError` from either level. Reading
+only the v4 shape does not crash — which is what makes it dangerous. Every result
+fails to match its call, so the document lists each tool twice, once with its
+body missing and once as `（未匹配的工具结果）`, and the error flag and any search
+sources are lost along with it.
 
 ## Everything else is optional
 
@@ -138,13 +171,22 @@ three shapes above will not.
 | unknown event type | ignored |
 | unparsable JSON line | skipped |
 | no `{type:"session"}` header in any frame | hard error, surfaced as HTTP 500 |
-| header `version` < 3 (chunk-row layouts) | warning to stderr; export attempted and marked incomplete |
+| session `version` outside 0–4 | no gate; rows are parsed by shape |
 
-We do not refuse a log because of its version number. The v0–v2 layouts carried
-message content in chunk rows (`text-chunks`, `reasoning-chunks`,
-`tool-call-chunks`, `assistant/chunk`) which no longer exist, so a v0 log
-exports as structure without content — but a *partially* readable transcript
-beats an exception.
+There is deliberately no version check. Parsing is driven by row *shapes*, and the
+three shapes above held from v0 through v4 — only the tool result changed, at v4,
+and both forms are handled. A log newer than any we have seen still exports; if a
+shape did change, the rows using it are ignored rather than crashing the export.
+
+Chunk rows (`text-chunks`, `reasoning-chunks`, `tool-call-chunks`,
+`assistant/chunk`) are ignored on purpose, and that is not the loss it looks
+like. They are a fine-grained streaming copy of content the finalized rows
+(`user/message`, `assistant/message`, `tool/result`) also carry, so reading both
+would double every message. Measured against real v0 logs, the finalized rows are
+complete: over the 178 steps of one session, no step had a text or tool-call
+chunk without its finalized counterpart. The residual gap is steps interrupted
+before a finalized message was written — 2 of those 178 — whose partial reasoning
+is therefore absent.
 
 ## Adding support for a new format
 

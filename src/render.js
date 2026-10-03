@@ -249,8 +249,9 @@ export function buildTurns(events, opts = {}) {
         if (kind === 'user') {
           current = { human: text, assistant: [], reasoning: [], tools: [], injected: [], system: [], aborted: false };
           turns.push(current);
-          toolIndex = new Map();
-          toolNames = new Map();
+          // toolIndex / toolNames 刻意不在这里重置。callId 全局唯一，而结果
+          // 可能晚于下一轮用户消息才写入（长时间运行的工具、审批流程）；按轮
+          // 清空会让这类结果匹配失败，在文档里多出一条"未匹配的工具结果"。
         } else if (opts.injected && text) {
           ensure().injected.push({ kind: kind ?? 'unknown', text });
         }
@@ -286,16 +287,33 @@ export function buildTurns(events, opts = {}) {
         break;
       }
       case 'tool/result': {
-        const callId = data.message?.toolCallId ?? data.toolCallId;
+        // 工具结果有两种形状，必须都认，否则老格式会静默错位：
+        //   v4      结果摊平成 text block，id 与 isError 挂在 message 上
+        //   v0–v3   外面包一层 tool-result block，id 与 isError 在那层上，
+        //           正文在它自己的 content 里
+        // 只认 v4 时，每次调用都会匹配失败，于是多出一条"未匹配的工具结果"
+        // （导出里每个工具出现两次），正文与失败标记同时丢失。
+        const message = data.message ?? {};
+        const blocks = Array.isArray(message.content) ? message.content.filter(Boolean) : [];
+        const wrapped = blocks.filter((block) => block.type === 'tool-result');
+
+        const callId = message.toolCallId
+          ?? wrapped[0]?.toolCallId
+          ?? message.source?.callId
+          ?? data.toolCallId;
+        const body = wrapped.length
+          ? wrapped.map((block) => textOf(block.content)).filter(Boolean).join('\n\n')
+          : textOf(blocks);
+        const isError = Boolean(message.isError ?? wrapped.some((block) => block.isError));
+
         const name = callId ? toolNames.get(callId) : undefined;
-        const body = textOf(data.message?.content);
         if (opts.tools) {
           const record = callId ? toolIndex.get(callId) : null;
           if (record) {
             record.result = body;
-            record.isError = Boolean(data.message?.isError);
+            record.isError = isError;
           } else {
-            ensure().tools.push({ name: '（未匹配的工具结果）', arguments: '', result: body, isError: Boolean(data.message?.isError) });
+            ensure().tools.push({ name: '（未匹配的工具结果）', arguments: '', result: body, isError });
           }
         }
         // web 检索结果里的信源同样计入 References（对应规范的 SEARCH 片段语义）

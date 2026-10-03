@@ -172,6 +172,125 @@ export function v4Events() {
 }
 
 /**
+ * A v0-shaped event stream.
+ *
+ * The finalized rows it relies on are the same ones v4 uses — v0 additionally
+ * writes a fine-grained streaming copy of everything (`reasoning-chunks`,
+ * `text-chunks`, `tool-call-chunks`, `assistant/chunk`), which a reader must
+ * ignore or it double-counts the whole conversation.
+ *
+ * What actually differs is the tool result: v0 wraps it in a `tool-result`
+ * block that carries the call id and the error flag one level deeper, with the
+ * body in that block's own `content`. Sessions keep the format they were
+ * written in, so these rows stay on disk indefinitely.
+ */
+export function v0Events() {
+  seq = 0;
+  const text = (value) => [{ type: 'text', text: value }];
+
+  return [
+    {
+      type: 'session/title',
+      seq: nextSeq(),
+      time: 1790000000000,
+      data: { title: TITLE, source: { kind: 'fallback' } },
+    },
+
+    // ---- turn 1: a search whose result must reach the record and References ---
+    {
+      type: 'user/message',
+      seq: nextSeq(),
+      time: 1790000001000,
+      data: { role: 'user', id: 'msg-v0-1', source: { kind: 'user' }, content: text('LEGACY-USER-MARKER') },
+    },
+    {
+      type: 'assistant/message',
+      seq: nextSeq(),
+      time: 1790000002000,
+      data: {
+        turn: 1,
+        step: 1,
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'reasoning', text: 'LEGACY-REASONING-MARKER' },
+            { type: 'tool-call', id: 'call-v0-search', name: 'web_search', arguments: '{"queries":["legacy"]}' },
+            { type: 'text', text: 'LEGACY-ANSWER-MARKER' },
+          ],
+        },
+      },
+    },
+    {
+      // 流式副本：读它会与上面的定稿消息重复计数
+      type: 'reasoning-chunks',
+      seq: nextSeq(),
+      time: 1790000002050,
+      data: { turn: 1, step: 1, index: 0, dt: [1, 0], texts: ['LEGACY', '-STREAM-ONLY-MARKER'] },
+    },
+    {
+      type: 'tool/result',
+      seq: nextSeq(),
+      time: 1790000002100,
+      data: {
+        turn: 1,
+        step: 1,
+        message: {
+          role: 'user',
+          source: { kind: 'tool', callId: 'call-v0-search' },
+          content: [{
+            type: 'tool-result',
+            toolCallId: 'call-v0-search',
+            content: text('Sources:\n- [Legacy Source](https://example.com/legacy-search?utm_source=tracking)'),
+          }],
+        },
+      },
+    },
+
+    // ---- turn 2: a failing tool, error flag also one level deeper ----------
+    {
+      type: 'user/message',
+      seq: nextSeq(),
+      time: 1790000003000,
+      data: { role: 'user', id: 'msg-v0-2', source: { kind: 'user' }, content: text('second question') },
+    },
+    {
+      type: 'assistant/message',
+      seq: nextSeq(),
+      time: 1790000004000,
+      data: {
+        turn: 2,
+        step: 1,
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'tool-call', id: 'call-v0-fail', name: 'bash', arguments: '{"command":"boom"}' },
+          ],
+        },
+      },
+    },
+    {
+      type: 'tool/result',
+      seq: nextSeq(),
+      time: 1790000004100,
+      data: {
+        turn: 2,
+        step: 1,
+        message: {
+          role: 'user',
+          source: { kind: 'tool', callId: 'call-v0-fail' },
+          content: [{
+            type: 'tool-result',
+            toolCallId: 'call-v0-fail',
+            isError: true,
+            content: text('LEGACY-ERROR-BODY'),
+          }],
+        },
+      },
+    },
+  ];
+}
+
+/**
  * Write a session log under `<root>/sessions/<project>/<sessionId>/`.
  * @param {string} root directory to treat as DSH_HOME
  * @param {{sessionId?: string, generation?: string, events?: object[], version?: number}} [options]

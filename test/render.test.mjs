@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { readSessionLog, hasZstdSupport } from '../src/session.js';
-import { renderMarkdown } from '../src/render.js';
-import { writeSession, TITLE, MODEL } from './fixtures.mjs';
+import { renderMarkdown, buildTurns } from '../src/render.js';
+import { writeSession, v0Events, TITLE, MODEL } from './fixtures.mjs';
 
 const home = mkdtempSync(path.join(tmpdir(), 'dsh-md-export-render-'));
 process.on('exit', () => rmSync(home, { recursive: true, force: true }));
@@ -125,4 +125,66 @@ test('loopback URLs and user-side links are not references', () => {
   assert.doesNotMatch(block, /user-side\.example\.com/);
   // …but the user's own text is still reproduced verbatim in the transcript
   assert.match(markdown, /user-side\.example\.com\/should-not-appear/);
+});
+
+// ---------------------------------------------------------------- v0 形状
+//
+// v0 会话与 v4 的差别只在工具结果的嵌套方式上。只认 v4 时匹配会失败，
+// 结果是导出里每个工具出现两次、输出为空、失败标记丢失——而且不报错。
+
+const legacy = { header: { id: 'session-v0-fixture', createdAt: 1790000000000 }, events: v0Events() };
+const renderLegacy = (opts = {}) => renderMarkdown(legacy, opts, {});
+
+test('v0: a tool result matches its call instead of becoming an orphan', () => {
+  const { turns } = buildTurns(legacy.events, { tools: true });
+  const records = turns.flatMap((turn) => turn.tools);
+
+  assert.equal(records.length, 2, 'expected exactly one record per tool call');
+  assert.equal(
+    records.filter((record) => record.name === '（未匹配的工具结果）').length,
+    0,
+    'a v0 result failed to match its call, which duplicates every tool in the export',
+  );
+});
+
+test('v0: the nested result body survives', () => {
+  const { turns } = buildTurns(legacy.events, { tools: true });
+  const search = turns.flatMap((turn) => turn.tools).find((record) => record.name === 'web_search');
+
+  assert.ok(search, 'the web_search record is missing');
+  assert.match(search.result, /Legacy Source/, 'the body inside the tool-result block was dropped');
+});
+
+test('v0: the error flag inside the wrapper block is honoured', () => {
+  const { markdown } = renderLegacy({ tools: true });
+  assert.match(markdown, /LEGACY-ERROR-BODY/);
+
+  const { turns } = buildTurns(legacy.events, { tools: true });
+  const failed = turns.flatMap((turn) => turn.tools).find((record) => record.name === 'bash');
+  assert.equal(failed.isError, true, 'a failed tool was reported as successful');
+});
+
+test('v0: search sources reach References', () => {
+  const { markdown } = renderLegacy();
+  assert.match(markdown, /### References/, 'no References section was emitted');
+  assert.match(
+    markdown,
+    /https:\/\/example\.com\/legacy-search/,
+    'a source from a v0 tool result never reached References',
+  );
+  assert.doesNotMatch(
+    markdown,
+    /utm_source=tracking/,
+    'the tracking parameter survived normalisation',
+  );
+});
+
+test('v0: the streaming duplicate is not read on top of the finalized rows', () => {
+  const { markdown } = renderLegacy({ reasoning: true });
+  assert.match(markdown, /LEGACY-REASONING-MARKER/, 'the finalized reasoning block is missing');
+  assert.doesNotMatch(
+    markdown,
+    /STREAM-ONLY-MARKER/,
+    'chunk rows were read as well, which double-counts the conversation',
+  );
 });
