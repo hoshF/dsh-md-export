@@ -119,7 +119,8 @@ git clone https://github.com/hoshF/dsh-md-export.git && cd dsh-md-export
 
 ## 用法
 
-**界面内。** 按钮位于会话标题栏的 utilities 插槽，文案跟随 App 的语言设置。点击后**立刻弹出系统保存框**，
+**界面内。** 按钮位于会话标题栏的 utilities 插槽，文案跟随 App 的语言设置。保存完成后
+会弹出一条横幅，回显实际写入的文件名。点击后**立刻弹出系统保存框**，
 随后写入 Markdown。建议文件名即对话标题，例如 `重构解析器.md`。
 
 **命令行。**

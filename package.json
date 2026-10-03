@@ -1,6 +1,6 @@
 {
   "name": "dsh-md-export",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "DSH Web session-header button that exports the current conversation as clean Markdown through a native save dialog.",
@@ -43,7 +43,8 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-primitives"
       ],
       "platform": "web"
     }

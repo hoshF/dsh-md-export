@@ -19,6 +19,36 @@ not its own API but DSH's internal session format:
 A change to the *rendered Markdown structure* is at least a minor bump, since
 downstream tooling may parse it.
 
+## [1.5.0]
+
+### Added
+
+- **A completion toast that echoes the saved filename.** The button label already
+  flipped to "Saved" for 1.6 seconds, but the button lives in the session header
+  while the user is looking at the save dialog, so the confirmation was easy to
+  miss entirely. A save now also raises the host's own `Toast` primitive — the
+  same transient banner the composer uses — naming the file that actually landed.
+
+  The name comes from `handle.name`, so it reflects any rename made in the dialog,
+  and it doubles as a check on the title-derived filename: the export can no
+  longer diverge from what the user believes they saved without saying so.
+
+### Changed
+
+- The manifest declares `@deepseek-ai/dsh-client-ui-primitives` in
+  `dsh.client.inject` so the client bundle can reach `Toast`. If that require
+  fails, the toast is simply absent and the button feedback remains; no save is
+  affected.
+
+### Notes
+
+- **Sound was considered and rejected.** A plugin that makes noise by default,
+  with no way to switch it off, is intrusive in a way nobody asked for; DSH has no
+  sound convention to follow; and a no-dependency, no-build-step package has no
+  audio asset to ship — a synthesised beep would sound cheap and vary by output
+  device. A toast carries the same signal, plus *which* file, and stays silent.
+  If sound is ever wanted it should be an opt-in setting, not a default.
+
 ## [1.4.1]
 
 ### Fixed
