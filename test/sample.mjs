@@ -1,15 +1,6 @@
 /**
- * The session that the README's output sample is generated from.
- *
- * This exists so the sample is not a hand-written illustration that can drift
- * away from what the renderer actually emits. `test/readme.test.mjs` renders
- * this session and compares the result to the block in both READMEs, so an
- * intentional change to the output is forced to update the documentation, and an
- * unintentional one fails the build.
- *
- * The content is invented. It is shaped to exercise the behaviours the README
- * goes on to point at: a heading in the user's message, a user-side URL, a
- * tracking parameter, a tool call, and thinking.
+ * Synthetic session for the README sample, checked by test/readme.test.mjs.
+ * Covers heading demotion, user URLs, attribution parameters, tools and thinking.
  */
 
 import { renderMarkdown } from '../src/render.js';
@@ -119,14 +110,14 @@ export function sampleEvents() {
   ];
 }
 
-/** The README sample, exactly as the shipped renderer produces it. */
-export function sampleMarkdown() {
+/** README samples, exactly as the shipped renderer produces them. */
+export function sampleMarkdown(options = {}) {
   return renderMarkdown(
     {
       header: { id: SAMPLE_SESSION_ID, createdAt: 1790000000000, cwd: '/home/you/notes' },
       events: sampleEvents(),
     },
-    { tools: true, reasoning: true },
+    options,
     { origin: SAMPLE_ORIGIN },
   ).markdown;
 }

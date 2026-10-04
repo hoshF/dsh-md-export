@@ -1,13 +1,5 @@
 /**
- * Keeps the README honest.
- *
- * The output sample is the README's main claim, and it is the kind of thing that
- * rots silently: the renderer changes, nobody re-reads the documentation, and the
- * published example becomes a description of a version that no longer exists.
- * The sample was in fact hand-wrapped when it was first written, which is exactly
- * the drift this catches.
- *
- * Both READMEs carry the same block, so both are checked.
+ * Keep both source samples and the reading preview in sync with the renderer.
  */
 
 import test from 'node:test';
@@ -21,42 +13,77 @@ import { sampleMarkdown } from './sample.mjs';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /**
- * The Time line is the one row that cannot be reproduced anywhere.
- * `formatLocalTime` deliberately formats in the machine's own timezone, so a
- * laptop at -07:00 and CI in UTC legitimately disagree — which is how this test
- * first failed, on every Node version, at line 4. It is normalised on both sides;
- * every other row is still compared byte-for-byte.
+ * Normalize the local-time row because formatLocalTime uses the runtime timezone.
  */
 const PLACEHOLDER_TIME = '- **Time:** <local time+offset>';
 const normalize = (rows) => rows.map((line) => (
   /^- \*\*Time:\*\* /.test(line) ? PLACEHOLDER_TIME : line
 ));
 
-/** Rows of the four-backtick markdown block, with trailing whitespace normalised. */
-function sampleBlock(file) {
-  const text = readFileSync(path.join(root, file), 'utf8');
-  const match = text.match(/^````markdown\n([\s\S]*?)^````/m);
-  assert.ok(match, `${file} has no fenced sample block`);
-  const rows = normalize(match[1].split('\n').map((line) => line.replace(/\s+$/, '')));
+function normalizedRows(text) {
+  const rows = normalize(text.split('\n').map((line) => line.replace(/\s+$/, '')));
   while (rows.length > 0 && rows[rows.length - 1] === '') rows.pop();
   return rows;
 }
 
-const rendered = normalize(sampleMarkdown().split('\n').map((line) => line.replace(/\s+$/, '')));
-while (rendered.length > 0 && rendered[rendered.length - 1] === '') rendered.pop();
+function markedSection(text, file, name) {
+  const start = `<!-- sample:${name}:start -->`;
+  const end = `<!-- sample:${name}:end -->`;
+  assert.equal(text.split(start).length - 1, 1, `${file}: ${start} must occur exactly once`);
+  assert.equal(text.split(end).length - 1, 1, `${file}: ${end} must occur exactly once`);
+  const from = text.indexOf(start);
+  const to = text.indexOf(end);
+  assert.ok(from < to, `${file}: ${name} markers are out of order`);
+  return text.slice(from + start.length, to).replace(/^\n+|\n+$/g, '');
+}
+
+function sourceSample(text, file, name) {
+  const section = markedSection(text, file, name);
+  const match = section.match(/^````markdown\n([\s\S]*)\n````$/);
+  assert.ok(match, `${file}: ${name} must contain exactly one four-backtick Markdown block`);
+  assert.equal(
+    section.split('\n').filter((line) => /^````(?:markdown)?$/.test(line)).length,
+    2,
+    `${file}: ${name} has extra four-backtick fences`,
+  );
+  return normalizedRows(match[1]);
+}
+
+function firstTurnPreview(markdown) {
+  const conversationHeading = '## Conversation\n\n';
+  const conversationStart = markdown.indexOf(conversationHeading);
+  assert.ok(conversationStart !== -1, 'default sample must have a Conversation section');
+  const conversation = markdown.slice(conversationStart + conversationHeading.length);
+  assert.ok(conversation.startsWith('### 🧑‍💻 User\n'), 'first turn must start with a user message');
+  const secondUser = conversation.indexOf('\n### 🧑‍💻 User\n');
+  assert.ok(secondUser !== -1, 'sample must contain a second turn');
+  const firstTurn = conversation.slice(0, secondUser).replace(/\n+$/, '');
+  assert.ok(firstTurn.includes('\n### 🤖 Assistant\n'), 'first turn must include an assistant answer');
+  return firstTurn.split('\n').map((line) => {
+    if (line === '### 🧑‍💻 User') line = '**🧑‍💻 User**';
+    if (line === '### 🤖 Assistant') line = '**🤖 Assistant**';
+    return line ? `> ${line}` : '>';
+  }).join('\n');
+}
+
+const defaultMarkdown = sampleMarkdown({});
+const detailedMarkdown = sampleMarkdown({ tools: true, reasoning: true });
 
 for (const file of ['README.md', 'README.zh.md']) {
-  test(`${file}: the published output sample is byte-for-byte what the renderer emits`, () => {
-    const published = sampleBlock(file);
-    const firstDiff = published.findIndex((line, i) => line !== rendered[i]);
+  for (const [name, markdown] of [['default', defaultMarkdown], ['detailed', detailedMarkdown]]) {
+    test(`${file}: ${name} source sample matches the renderer`, () => {
+      const text = readFileSync(path.join(root, file), 'utf8');
+      assert.deepEqual(sourceSample(text, file, name), normalizedRows(markdown));
+    });
+  }
 
-    // Report the first divergence rather than a 56-line wall of diff.
-    assert.equal(
-      published.length === rendered.length && firstDiff === -1,
-      true,
-      firstDiff === -1
-        ? `line count differs: README has ${published.length}, renderer produces ${rendered.length}`
-        : `line ${firstDiff + 1} differs:\n  README:   ${JSON.stringify(published[firstDiff])}\n  renderer: ${JSON.stringify(rendered[firstDiff])}`,
-    );
+  test(`${file}: preview displays the first default question and answer before the source samples`, () => {
+    const text = readFileSync(path.join(root, file), 'utf8');
+    const preview = markedSection(text, file, 'preview');
+    assert.deepEqual(normalizedRows(preview), normalizedRows(firstTurnPreview(defaultMarkdown)));
+    assert.ok(preview.split('\n').every((line) => line === '>' || line.startsWith('> ')));
+    assert.ok(!/^> #{1,6} /m.test(preview), 'preview must not add headings to the README outline');
+    assert.ok(text.indexOf('<!-- sample:preview:end -->') < text.indexOf('<!-- sample:default:start -->'));
+    assert.ok(text.indexOf('<!-- sample:default:end -->') < text.indexOf('<!-- sample:detailed:start -->'));
   });
 }

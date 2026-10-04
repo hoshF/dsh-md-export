@@ -24,11 +24,15 @@ Changes to the rendered Markdown structure require at least a minor bump.
   language subscriptions and refresh state.
 - Preserve the profile lockfile when reinstalling, using `pnpm add --force` after
   removing the previous package.
+- Put installation first in both READMEs, show the default output before optional
+  records, and document title-bearing notes with `--h1`.
 
 ### Added
 
 - Language-switching and installer regressions covering repeated installation
   and preservation of other profile plugins.
+- Verify both README output modes and the rendered default excerpt against the
+  shared renderer.
 
 ## [1.7.2] - 2026-10-03
 
