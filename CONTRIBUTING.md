@@ -84,24 +84,19 @@ a newer DSH or a dropped session format, minor for a capability or a rendered
 Markdown shape change, patch for a behaviour fix.
 
 **Not every change gets a version.** Documentation, tests, CI, comments and
-behaviour-preserving refactors never bump on their own; they accumulate under
-`[Unreleased]` and ride along with the next release that has a user-visible change
-in it. This repository learned that the hard way: its first day produced ten tags
-in four hours, two of which contained no behaviour change at all, which made the
-version line claim more history than the calendar supported.
+behaviour-preserving refactors accumulate under `[Unreleased]` and ride along with
+the next release that contains a user-visible change. Batch several changes into
+one release.
 
-Cut a release when at least one user-visible change has accumulated, and prefer
-batching several. Then:
+To cut a release:
 
-1. Move the `[Unreleased]` entries under the new version heading with today's date.
+1. Move the `[Unreleased]` entries under a new version heading with today's date.
 2. Set the same version in `package.json`.
-3. Commit, tag `v<version>`, and open a Release whose notes are the new section.
+3. Commit, tag `v<version>` on that commit, and open a Release whose notes are the
+   new section.
 
-**Every version is a tag and a CHANGELOG entry. Only some are Releases.** The
-Releases page carries milestones; intermediate versions are reachable through
-their tags and the changelog, so a tag without a Release is not a missing release.
-Tag the commit that set the version — not a later one — or the CHANGELOG will not
-match the tree the tag points at.
+Every version is a tag and a CHANGELOG entry; milestone versions also get a
+Release. Intermediate versions are reachable through their tags and the changelog.
 
 ## Reporting a bug
 
