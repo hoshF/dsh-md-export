@@ -1,13 +1,6 @@
 /**
- * Synthetic session-log fixtures.
- *
- * Fixtures are generated rather than committed as binaries for two reasons:
- * the event shapes stay readable and reviewable in code, and the multi-frame
- * zstd layout that breaks naive readers is spelled out explicitly.
- *
- * DSH appends one zstd frame per flush. `writeSession` therefore emits three
- * frames on purpose: a reader that decodes only the first (what Node's
- * `zstdDecompressSync` does on its own) will see the header and nothing else.
+ * Readable synthetic event fixtures. writeSession emits separate frames for the
+ * header and both event halves to exercise concatenated Zstandard decoding.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -172,17 +165,8 @@ export function v4Events() {
 }
 
 /**
- * A v0-shaped event stream.
- *
- * The finalized rows it relies on are the same ones v4 uses — v0 additionally
- * writes a fine-grained streaming copy of everything (`reasoning-chunks`,
- * `text-chunks`, `tool-call-chunks`, `assistant/chunk`), which a reader must
- * ignore or it double-counts the whole conversation.
- *
- * What actually differs is the tool result: v0 wraps it in a `tool-result`
- * block that carries the call id and the error flag one level deeper, with the
- * body in that block's own `content`. Sessions keep the format they were
- * written in, so these rows stay on disk indefinitely.
+ * v0-shaped finalized messages and streaming duplicates. Tool-result blocks carry
+ * the id, error flag and nested content; streaming rows must not be counted again.
  */
 export function v0Events() {
   seq = 0;

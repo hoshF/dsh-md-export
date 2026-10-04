@@ -2,9 +2,7 @@
 /**
  * Manual smoke test against a real DSH session.
  *
- * The automated suite is hermetic (synthetic fixtures only). This script is for
- * checking the real thing on a real machine — after a DSH upgrade, say, to see
- * whether the current session format still round-trips.
+ * Validate storage compatibility after a DSH upgrade.
  *
  *   node test/smoke-real-session.mjs [sessionId]
  *

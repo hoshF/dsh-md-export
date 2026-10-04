@@ -1,397 +1,232 @@
 # Changelog
 
-All notable changes to this project are documented here.
-
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
-this project adheres to the versioning policy below.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Versioning policy
 
-This project's version numbers mean something specific, because its main risk is
-not its own API but DSH's internal session format:
-
-| bump | means |
+| bump | meaning |
 |---|---|
-| **major** | requires a newer DSH, **or** drops support for a session format that previously worked |
-| **minor** | new capability: a new flag, metadata field, endpoint, or document section |
-| **patch** | fixes that do not change the shape of the output |
+| **major** | requires a newer DSH or drops a previously supported session format |
+| **minor** | adds a capability, flag, metadata field, endpoint or document section |
+| **patch** | fixes behavior without changing the output structure |
 
-A change to the *rendered Markdown structure* is at least a minor bump, since
-downstream tooling may parse it.
+Changes to the rendered Markdown structure require at least a minor bump.
 
 ## [Unreleased]
+
+### Changed
+
+- Add a contributor architecture guide and simplify documentation and comments
+  around current interfaces, runtime boundaries and maintenance requirements.
+- Share session title selection, remove the unused single-frame decoder wrapper,
+  and extract client request/write helpers without changing export behavior.
+- Use the slot's locale namespace and injected translator instead of custom
+  language subscriptions and refresh state.
+- Preserve the profile lockfile when reinstalling, using `pnpm add --force` after
+  removing the previous package.
+
+### Added
+
+- Language-switching and installer regressions covering repeated installation
+  and preservation of other profile plugins.
 
 ## [1.7.2] - 2026-10-03
 
 ### Fixed
 
-- Reject corrupt or truncated zstd frames and trailing garbage instead of silently
-  skipping content; validate complete frame boundaries and the decoder's input
-  consumption.
-- Preserve consecutive blank lines in message code blocks and tool arguments/results.
-- Keep Unicode surrogate pairs intact when truncating title-based filenames.
+- Reject corrupt or truncated Zstandard frames and trailing garbage by validating
+  complete frame boundaries and decoder input consumption.
+- Preserve consecutive blank lines in message code blocks and tool records.
+- Preserve Unicode surrogate pairs when truncating title-based filenames.
 - Exclude sentence punctuation from bare references and number mixed bare/Markdown
-  links by their actual first appearance, retaining labelled duplicates.
-- Cancel stale saved-state timers and prevent overlapping exports or UI updates
-  after unmount; cancellation and failures allow retrying.
-- Reject missing CLI output paths before writing files, and list all sessions
-  instead of silently stopping at 40.
-- Remove misleading pre-v3 warnings from the CLI and manual smoke script. Earlier
-  changelog statements that these warnings never existed have been corrected.
+  links by first appearance, retaining labels from duplicate links.
+- Prevent overlapping exports, stale saved-state timers and UI updates after
+  unmount; cancellation and failures allow retrying.
+- Reject missing CLI output paths and list all sessions without a row limit.
+- Remove pre-v3 incomplete-export warnings from the CLI and manual smoke script.
 
 ### Added
 
-- Compression integrity, content-preservation, Unicode filename, reference,
-  client lifecycle and CLI regression tests; all `test/*.test.mjs` files run in CI.
+- Compression integrity, content, filename, reference, client lifecycle and CLI
+  regression tests; run all `test/*.test.mjs` files in CI.
 
 ### Documentation
 
-- Synchronise both READMEs and the format contract with strict frame decoding,
-  filename refresh timing, whitespace preservation and CLI argument handling.
+- Update both READMEs and the format contract for frame integrity, filename
+  refresh timing, whitespace preservation and CLI arguments.
 
 ## [1.7.1]
 
 ### Added
 
-- **A test guards the published output sample.** The first draft of that sample had
-  been hand-wrapped, so it was not the renderer's output despite claiming to be.
-  `test/readme.test.mjs` renders `test/sample.mjs` and compares the result to the
-  block in both READMEs, reporting the first differing line rather than a wall of
-  diff. An intentional change to the output therefore has to update the
-  documentation; an accidental one fails the build instead of quietly making the
-  README false. The suite is 42 tests.
-
-  The comparison normalises the `**Time:**` row, which `formatLocalTime` formats in
-  the machine's own timezone — CI runs in UTC and a laptop does not, which is how
-  the first version of this test failed on all three Node versions.
+- Compare the published samples in both READMEs against renderer output, with the
+  local-time row normalized for timezone differences.
 
 ## [1.7.0]
 
 ### Changed
 
-- **Every label in an exported document is now English.** The skeleton already was
-  (`## Metadata`, `### 🧑‍💻 User`, `#### 💡 Response`, `### References`), but six
-  strings this plugin adds were hardcoded Chinese: the tool-call summary, the
-  `**Result**` / `**Result (error)**` markers, the injected-message and
-  system-prompt labels, the unmatched-result placeholder, and the interrupted-turn
-  note. An English document therefore contained a Chinese section, which is an
-  accident rather than a feature. The document stays English by convention; it is
-  the *UI* copy that follows the app's language setting.
+- Use English throughout exported documents, including tool records, injected
+  messages, system prompts and interrupted-turn notices.
 
 ### Fixed
 
-- **The README claimed things that were not true.** The support matrix listed
-  session formats as "v3 and v4", with v0–v2 described as emitting a warning and
-  an incomplete export — the renderer and HTTP route did not emit that warning,
-  while the CLI and manual smoke script retained it until the 1.7.2 fixes.
-  v0, v3 and v4 are all supported (see 1.6.1). It also described the CI matrix as Node 20/22/24 when it
-  is 22.15/24/26, and described the filename prefetch as happening at mount when
-  the click now refetches it.
+- Correct README compatibility, runtime matrix and filename-refresh descriptions.
 
 ### Documentation
 
-- Both READMEs are restructured around what a reader wants first: a **real,
-  unedited sample of the output** — generated by running the renderer, not written
-  by hand — then features, then install, then reference material, with the same
-  section order in both languages and a badge row and anchored navigation.
-  The sample is annotated to point out the four behaviours it demonstrates
-  (heading demotion, user-side URLs excluded from References, tracking parameters
-  stripped, thinking and tool calls being opt-in).
+- Reorganize both READMEs around generated output samples, features, installation
+  and reference material, with matching navigation and explanations.
 
 ## [1.6.1]
 
 ### Fixed
 
-- **Tool results in v0–v3 sessions never matched their calls.** Those formats wrap
-  a result in a `tool-result` block carrying the call id and the error flag one
-  level deeper than v4 does, and only the v4 shape was read. Nothing crashed,
-  which is what made it bad: every result failed to match, so each tool appeared
-  twice in the document — once with an empty body and once as
-  `（未匹配的工具结果）` — tool output was lost entirely, failed calls were
-  reported as successful, and search sources inside those results never reached
-  `### References`.
-
-  Measured on this machine before the fix: 4,552 results across 56 old-format
-  sessions, of which 4,552 were unmatched, 0% carried output and 0 carried an
-  error flag. After: 4,552 matched, 100% with output, 71 error flags, 0 orphans.
-
-- **A result arriving after the next user turn no longer goes unmatched.** The
-  call-id lookup tables were rebuilt on every user message, so a result written
-  later — a long-running tool, an approval flow — could not find its call. callIds
-  are unique within a session, so the tables now persist for the whole session.
-  This removed 32 stray unmatched entries from current-format sessions.
+- Match wrapped tool results in v0 and v3 logs to their calls, preserving bodies,
+  error flags and search references.
+- Match delayed tool results across human turns by retaining session-wide call
+  lookup tables.
 
 ### Changed
 
-- `docs/FORMAT.md` had both of these wrong. It promised a stderr warning and an
-  "incomplete" mark for `version < 3` that the renderer never emitted (the CLI and
-  manual smoke warnings were removed in 1.7.2), and it
-  asserted that v0–v2 kept message content only in chunk rows. Real v0 logs carry
-  the finalized rows as well, so no such warning was ever needed. The document now
-  states the actual policy — no version gate, rows dispatched by shape — and
-  records the one real gap: steps interrupted before a finalized message was
-  written, whose partial reasoning exists only as chunks.
+- Document shape-based parsing without a version gate and the omission of partial
+  content that lacks a finalized message.
 
 ## [1.6.0]
 
 ### Changed
 
-- **The button no longer has a hover tooltip.** Its `title` was the source of a
-  native tooltip that lingered for several seconds after the pointer left — long
-  enough to sit on top of the completion toast for that toast's entire life,
-  which is how it turned up covering the filename in the first demo recording.
-  The explanation it carried is now an `aria-describedby` pointing at a visually
-  hidden node: assistive technology still reads it, nothing floats over the UI.
-  The button's accessible name remains its visible label, so WCAG's Label in Name
-  still holds.
+- Replace the native hover tooltip with an accessible description while retaining
+  the button's visible label as its accessible name.
 
 ### Added
 
-- **Failures now report through the toast**, with a red alert glyph and a longer
-  hold, instead of only appearing in that tooltip. The previous behaviour put the
-  reason for a failed export behind a hover, which is the worst place for
-  something a user needs to read.
+- Display export failures in a toast with an alert glyph and a longer duration.
 
 ## [1.5.1]
 
 ### Changed
 
-- **The toast's check is green, and it is the host's own glyph.** Two details
-  make it native rather than approximate. The colour is the host's semantic token
-  `--dsw-alias-state-success-primary`, defined as `var(--dsw-static-green-500)` and
-  already used by the app for green status text and added-line counts — so it
-  follows the theme instead of hardcoding a hex that would be wrong in one of
-  them. The glyph is the host's `IconCheckOutlineRegular`, so the stroke weight
-  matches the icons around it.
-
-  Both are resolved defensively. If either name is missing the plugin falls back
-  to its own check coloured by the same token, and if the primitive package cannot
-  be required at all the toast is simply absent.
+- Use the host's check glyph and semantic success color in completion toasts,
+  with an inline glyph fallback when the host icon is unavailable.
 
 ## [1.5.0]
 
 ### Added
 
-- **A completion toast that echoes the saved filename.** The button label already
-  flipped to "Saved" for 1.6 seconds, but the button lives in the session header
-  while the user is looking at the save dialog, so the confirmation was easy to
-  miss entirely. A save now also raises the host's own `Toast` primitive — the
-  same transient banner the composer uses — naming the file that actually landed.
-
-  The name comes from `handle.name`, so it reflects any rename made in the dialog,
-  and it doubles as a check on the title-derived filename: the export can no
-  longer diverge from what the user believes they saved without saying so.
+- Show a completion toast containing the saved filename, including renames made
+  in the native dialog.
 
 ### Changed
 
-- The manifest declares `@deepseek-ai/dsh-client-ui-primitives` in
-  `dsh.client.inject` so the client bundle can reach `Toast`. If that require
-  fails, the toast is simply absent and the button feedback remains; no save is
-  affected.
-
-### Notes
-
-- **Sound was considered and rejected.** A plugin that makes noise by default,
-  with no way to switch it off, is intrusive in a way nobody asked for; DSH has no
-  sound convention to follow; and a no-dependency, no-build-step package has no
-  audio asset to ship — a synthesised beep would sound cheap and vary by output
-  device. A toast carries the same signal, plus *which* file, and stays silent.
-  If sound is ever wanted it should be an opt-in setting, not a default.
+- Declare the host UI primitives client dependency; retain button feedback when
+  toast primitives are unavailable.
 
 ## [1.4.1]
 
 ### Fixed
 
-- **A brand-new conversation exported as `dsh-<short id>.md`.** The client
-  fetched the filename once on mount and kept that snapshot forever. A new
-  conversation has no title at the moment its session view mounts — the title is
-  produced after the first prompt — so the snapshot was the untitled fallback,
-  and it stayed wrong until the component happened to remount (switching to
-  another conversation and back). The name is now refetched on every click, with
-  the mount-time snapshot kept only as a fallback when that request fails, and
-  the request is bounded by a timeout so it cannot stall the save dialog.
-
-  The reasoning behind the original ordering was overstated: the point is to
-  reach `showSaveFilePicker()` inside the transient activation window (~5s), and
-  a local metadata request costs milliseconds. Refetching first is safe; caching
-  a pre-title snapshot is not.
+- Refresh the suggested filename on every export click with a bounded metadata
+  request, retaining the mount-time value as a fallback.
 
 ## [1.4.0]
 
 ### Added
 
-- **The UI copy is localised.** The button was hardcoded Chinese, so in an
-  English UI it was the only Chinese string in the session header. It now
-  registers `zh` and `en` dictionaries with the host's locale service and
-  subscribes to `locale/change`, so switching the language in Settings updates it
-  without a reload. The plugin does not decide the language itself — that is the
-  host's precedence chain (explicit user choice, then browser language, then
-  English) — and it deliberately does not read `navigator.language`, which would
-  bypass the user's own setting.
+- Register English and Chinese UI dictionaries with the host locale service and
+  update labels when the app language changes.
 
 ### Changed
 
-- A download glyph precedes the label, and the label is shorter. The icon is
-  inline SVG rather than an emoji, which renders differently on every platform.
-  Icon-only was considered and rejected: the session header already offers the
-  official *Download session log*, which produces a ZIP of JSONL rather than a
-  readable transcript, and an unlabelled arrow cannot be told apart from it.
-- `title` and `aria-label` text follow the language too.
+- Add an inline download glyph and shorten the button label.
+- Localize button tooltip and accessible-label text.
 
 ## [1.3.2]
 
 ### Fixed
 
-- **The plugin required a newer Node than it claimed.** `engines` said `>=20` and
-  the README said the same, but reading a session log needs
-  `zstdDecompressSync`, which `node:zlib` only gained in **Node 22.15** (23.8 on
-  the 23 line). On Node 20 the named import made the module fail to *link*, so the
-  plugin did not even load — it surfaced as `does not provide an export named
-  'zstdDecompressSync'`. `engines` now says `>=22.15`, the docs say so, and
-  `src/session.js` imports `node:zlib` as a namespace and checks at runtime so an
-  unsupported runtime gets a sentence instead of a module error. The plugin also
-  warns once at load time in that case.
-
-  CI caught this: the Node 20 matrix leg failed while 22, 24 and 26 passed. The
-  matrix is now `22.15.0` (the real floor), `24` and `26` — testing the claimed
-  minimum is the point.
-- The unsupported-runtime error was being swallowed. `decompressZstdAll()`
-  catches failures while probing for frame boundaries, which also caught "this
-  runtime has no zstd" and replaced it with a misleading
-  `zstd frame boundary parse failed`. The capability check now runs before the
-  loop.
+- Require Node 22.15 or newer and report unavailable Zstandard support explicitly
+  at load time and before decompression.
+- Test the minimum supported runtime in the Node 22.15/24/26 CI matrix.
 
 ### Changed
 
-- `install.sh` deletes the profile lockfile before installing. pnpm reuses the
-  previously locked tarball when a rebuilt one keeps the same version, so
-  editing the source and re-running the script could report success while
-  changing nothing. A profile locks only this one dependency, so there is no
-  cost to regenerating it.
+- Regenerate the profile lockfile during installation to refresh same-version
+  tarball dependencies.
 
 ## [1.3.1]
 
-An audit pass over the repository rather than a feature change: dead code,
-hardcoded values, and traces of the machine it was developed on.
-
 ### Fixed
 
-- **`install.sh` installed the dependency but never registered the bundle.** A
-  profile only loads a package listed in `dsh.profile.bundles`, so a fresh clone
-  produced a plugin that was present and completely inert — the script warned
-  about the missing registration instead of performing it. It now reconciles the
-  list the way `dsh plugin` and the app's Plugins page do, and is idempotent.
-  This went unnoticed because the development profile already carried the
-  registration from an earlier manual install; the from-scratch path was never
-  exercised.
-- **`collectLinks` used a 400-character proximity window** to guess whether a
-  bare URL was already part of a `[label](url)` link. Long labels and several
-  links in one paragraph were misjudged, so a URL could be counted twice or
-  missed entirely. Link spans are now masked out exactly before scanning for
-  bare URLs, and the heuristic is gone.
+- Register the installed package in `dsh.profile.bundles` idempotently.
+- Mask exact Markdown link spans before scanning bare URLs to avoid duplicate or
+  missed references.
 
 ### Changed
 
-- Magic numbers replaced with named constants: the filename stem cap, the
-  short-id length, the markdown label cap, and the client's "saved" state
-  duration.
-- The fallback filename is built by one shared function
-  (`fallbackMarkdownFilename`) instead of being spelled out in `src/render.js`
-  and again in `src/index.js`. The client's copy cannot be shared, and now says
-  why it mirrors the host.
-- Both sides of the duplicated route path point at each other, since a browser
-  module cannot import host ESM and a change has to be made in two places.
-- `package.json` carries the repository metadata, and the READMEs name the
-  project's real URL.
+- Replace filename, short-id, link-label and saved-state limits with named constants.
+- Share fallback filename generation on the host and document client/host copies
+  of shared constants.
+- Add repository metadata and project links.
 
 ### Added
 
-- README: how to update and uninstall, and a note that a git install resolves to
-  a commit, so updating means installing again.
+- Document update and uninstall procedures, including reinstalling git dependencies.
 
 ### Removed
 
-- The unused `writeSessionHome` fixture helper.
-- Real session identifiers, workspace paths, port numbers and conversation
-  titles that had leaked into the READMEs, the changelog and the tests from the
-  machine this was developed on. Every example is synthetic now.
+- Remove the unused `writeSessionHome` fixture helper.
+- Replace personal session identifiers and machine-specific examples with synthetic data.
 
 ## [1.3.0]
 
-Clean-room rewrite, a real test suite, and the project scaffolding needed to
-publish it.
-
 ### Changed
 
-- **Rewrote the formatting helpers as an independent implementation.**
-  `stripHashes`, `normalizeRefUrl`, `formatRefLine`, `formatLocalTime` and the
-  reference collector were previously written with the AfterChat userscript open;
-  that project is **AGPL-3.0**, which is incompatible with distributing this one
-  under MIT. The document *format* is shared and credited; the code is now our
-  own. The attribution parameter list was re-derived from the stated criterion
-  ("this parameter exists only to mark a source") rather than copied.
-- Fenced-code detection now follows CommonMark more closely: a fence closes only
-  on the same character at equal or greater length.
+- Reimplement formatting helpers under the project's MIT license while retaining
+  document-format attribution.
+- Require closing code fences to use the opening character at equal or greater length.
 
 ### Fixed
 
-- **Tool call names were only recorded when `tools` was enabled**, so
-  `web_search` / `web_fetch` sources were silently missing from References in
-  the default export.
+- Collect search and fetch references even when tool records are disabled.
 
 ### Added
 
-- `test/fixtures.mjs` — synthetic session logs, generated rather than committed
-  as opaque binaries, including a deliberate multi-frame layout.
-- `test/render.test.mjs` — event stream → Markdown, including the case that
-  catches single-frame decoding (`LAST-FRAME-MARKER` lives in the final frame).
-- `test/host.test.mjs` — route tests with a temp `DSH_HOME`; hermetic, so it runs
-  in CI. Covers trust-fence rejections and generation selection.
-- `test/smoke-real-session.mjs` — manual check against a real session.
-- `npm test` and a GitHub Actions matrix (Node 20 / 22 / 24).
-- `docs/FORMAT.md` — the session-format contract this plugin depends on.
-- `CONTRIBUTING.md`.
+- Add generated multi-frame fixtures, renderer tests, isolated HTTP route tests
+  and a manual real-session smoke script.
+- Add `npm test`, an initial Node 20/22/24 CI matrix, the format contract and
+  contribution guidelines.
 
 ## [1.2.0]
 
 ### Added
 
-- `GET /api/md-export?meta=1` — lightweight JSON metadata (`title`, `filename`,
-  `model`, `version`). It exists so the client can know the filename **before**
-  the click, because `showSaveFilePicker()` requires transient user activation
-  and cannot be awaited behind a network request.
+- Add `GET /api/md-export?meta=1` metadata (`title`, `filename`, `model`, `version`)
+  for save-dialog filename selection.
 
 ### Changed
 
-- **The suggested filename is now the conversation title** (for example
-  `重构解析器.md`) instead of `dsh-<id>-<timestamp>.md`. Falls back to
-  `dsh-<short id>.md` when the session has no title.
+- Suggest the conversation title as the filename, falling back to `dsh-<short id>.md`.
 
 ## [1.1.0]
 
 ### Changed
 
-- **Adopted the ChatFormat-style document layout**: `## Metadata` as a bullet
-  list, `### 🧑‍💻 User` / `### 🤖 Assistant` role headings with no turn numbers or
-  horizontal rules, `#### 🤔 Thought Process` + `#### 💡 Response` when thinking is
-  included, and a `### References` section.
-- Message bodies are passed through `stripHashes()` so a `# Heading` inside a
-  reply cannot outrank the document outline. Fenced code is preserved verbatim.
-- References are deduplicated by normalized URL and numbered by first
-  appearance. Loopback addresses are excluded.
+- Adopt Metadata, Conversation, role headings, optional Thought Process/Response
+  sections and References without turn numbers or horizontal rules.
+- Demote message headings to bold text while preserving fenced code.
+- Deduplicate references by normalized URL, number them by first appearance and
+  exclude loopback addresses.
 
 ### Added
 
-- The CLI moved into `bin/`; `~/bin/dsh-md-export.mjs` is now a symlink to it.
+- Move the CLI into `bin/`, with a user-bin symlink for direct invocation.
 
 ## [1.0.0]
 
 ### Added
 
-- `导出 MD` action in the DSH Web session header, writing the conversation to a
-  file chosen through the native save dialog.
-- Host route `GET|POST /api/md-export`, with a Host/Origin trust fence mirroring
-  DSH Web's `/api` handling.
-- Direct session-log reading, including multi-frame zstd decompression.
-- `stripHashes`, `normalizeRefUrl`, and the reference collector.
-- Hermetic-free first cut of `install.sh`.
+- Add a session-header Markdown export action using the native save dialog.
+- Add `GET|POST /api/md-export` with a Host/Origin trust boundary.
+- Read session logs directly with multi-frame Zstandard decompression.
+- Add heading demotion, URL normalization, reference collection and an install script.

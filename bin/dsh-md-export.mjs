@@ -1,26 +1,7 @@
 #!/usr/bin/env node
 /**
- * dsh-md-export — CLI: export a DSH session log as Markdown.
- *
- * Shares the exact same core as the in-app "导出 MD" button (../src), so both
- * produce byte-identical output: ## Metadata / ## Conversation / ### References.
- *
- * Usage:
- *   node bin/dsh-md-export.mjs                        # newest session
- *   node bin/dsh-md-export.mjs <file|sessionId prefix>
- *   node bin/dsh-md-export.mjs --list
- *
- * Options:
- *   -o, --out <path>   write to a path (default: ~/dsh-transcripts/)
- *       --stdout       write to stdout
- *       --list         list every session
- *       --h1           prepend a `# Title` line (off by default, per the spec)
- *       --tools        include tool calls and results
- *       --reasoning    include thinking (#### 🤔 Thought Process)
- *       --injected     include injected user-side messages
- *       --system       include system prompts
- *       --all          all of the above
- *   -h, --help         show this help
+ * CLI entry point using the same session reader and renderer as the host route.
+ * Run with --help for usage and options.
  *
  * Environment:
  *   DSH_MD_EXPORT_CORE   override the core directory (default: ../src)

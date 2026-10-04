@@ -1,10 +1,6 @@
 /**
- * Rendering tests over a synthetic session log.
- *
- * These build their own fixture, so they run anywhere — no DSH installation, no
- * personal session data. The critical case is `LAST-FRAME-MARKER`: it lives in
- * the final zstd frame, so seeing it proves every frame was decompressed rather
- * than just the first.
+ * Rendering tests using synthetic logs; LAST-FRAME-MARKER verifies that content
+ * from the final compressed frame is included.
  */
 
 import test from 'node:test';
@@ -187,10 +183,8 @@ test('explicit Markdown destinations and encoded URL punctuation are preserved',
   assert.match(refs, /\(https:\/\/example\.com\/path%2E\?q=why%3F\)/);
 });
 
-// ---------------------------------------------------------------- v0 形状
-//
-// v0 会话与 v4 的差别只在工具结果的嵌套方式上。只认 v4 时匹配会失败，
-// 结果是导出里每个工具出现两次、输出为空、失败标记丢失——而且不报错。
+// ---------------------------------------------------------------- v0 shape
+// Wrapped tool results carry ids, flags and bodies inside a tool-result block.
 
 const legacy = { header: { id: 'session-v0-fixture', createdAt: 1790000000000 }, events: v0Events() };
 const renderLegacy = (opts = {}) => renderMarkdown(legacy, opts, {});

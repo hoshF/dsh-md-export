@@ -4,9 +4,7 @@
 #   ./install.sh
 #
 # Pack -> install -> report the profile's dependency and bundle registration.
-# Afterwards, HARD-refresh the DSH page (Cmd+Shift+R / Ctrl+Shift+R) for the
-# client half; host-side code changes require restarting DSH entirely. An
-# ordinary reload can serve the client bundle cached from a previous version.
+# Restart DSH for host changes and hard-refresh the page for client changes.
 #
 # Overridable environment:
 #   DSH_HOME          DSH home                    (default: ~/.dsh)
@@ -76,25 +74,15 @@ TARBALL="$(ls -t "$SRC"/dist/"$PACKAGE"-*.tgz | head -1)"
 echo "-> installing $(basename "$TARBALL")"
 cd "$PROFILE_DIR"
 
-# Remove first: otherwise pnpm resolves the spec already recorded in
-# package.json, and a cleaned-up tarball makes that fail with ENOENT, silently
-# aborting the whole `add`.
+# Remove the old spec before resolving a replacement local tarball.
 run_pnpm remove "$PACKAGE" >/dev/null 2>&1 || true
 
-# Drop the lockfile as well. It records the previous tarball's integrity, and
-# pnpm will reuse that copy when a rebuilt tarball keeps the same version — so a
-# source change would appear to install while changing nothing. A profile locks
-# only this one dependency, so regenerating it costs nothing.
-rm -f "$PROFILE_DIR/pnpm-lock.yaml"
-
-run_pnpm add "file:$TARBALL" >/dev/null
+# Refresh same-version packages while preserving the profile's lockfile.
+run_pnpm add --force "file:$TARBALL" >/dev/null
 
 # ------------------------------------------------------------------ register
 
-# Installing the dependency is not enough: a profile only loads a package that
-# is also listed in `dsh.profile.bundles`. `dsh plugin` and the app's Plugins
-# page both reconcile this list after installing; do the same here, or a fresh
-# clone installs a plugin that never runs.
+# DSH loads installed bundles listed in dsh.profile.bundles.
 echo "-> registering the bundle"
 "$NODE" -e '
 const fs = require("fs");
@@ -111,7 +99,7 @@ try {
     fs.readFileSync(path.join(profileDir, "node_modules", pkg, "package.json"), "utf8"));
   declaresBundle = installed.dsh?.bundle?.patch !== undefined;
 } catch {
-  // Leave the manifest alone rather than guessing.
+  // No readable bundle declaration: keep the profile unchanged.
 }
 
 if (!declaresBundle) {

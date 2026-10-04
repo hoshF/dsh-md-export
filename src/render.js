@@ -1,20 +1,7 @@
 /**
- * 会话事件 → Markdown。
- *
- * 文档结构：
- *   ## Metadata        —— 项目符号 + 粗体键 + 反引号值
- *   ## Conversation    —— ### 🧑‍💻 User / ### 🤖 Assistant
- *                        可选 #### 🤔 Thought Process + #### 💡 Response
- *   ### References     —— 按归一化 URL 去重，按首次出现编号
- *
- * 文档标签一律英文，与骨架保持一致；界面文案才跟随 App 语言（见 lib/client.js）。
- *
- * 两条贯穿全文的规则：
- *   1. 正文里的 `# 标题` 降级为 `**加粗**`（围栏感知），保证正文永远压不过文档大纲。
- *   2. 引用按「首次出现顺序」编号；URL 先归一化（去 hash、去追踪参数、去尾斜杠）再去重。
- *
- * 本文件是独立实现。文档格式沿用了 ChatFormat 一类的对话导出约定（见 README 致谢），
- * 但算法与代码均为本仓库自写，未取自任何其他导出器的源码。
+ * Session events to English Markdown: Metadata, Conversation and References.
+ * Demote message headings outside code fences; deduplicate normalized references
+ * in first-appearance order. UI localization belongs to lib/client.js.
  */
 
 const ROLE_USER = '### 🧑‍💻 User';
@@ -105,9 +92,8 @@ export function stripHashes(text) {
 }
 
 /**
- * 仅用于归因与统计、从 URL 中剔除的参数。
- * 收录标准：该参数的存在只为标记来源渠道，去掉后不影响资源定位。
- * 这是一个按上述标准自行拟定的清单，不是从任何项目抄来的。
+ * Source-attribution parameters removed when normalizing reference URLs.
+ * Only include attribution parameters whose removal preserves the resource identity.
  */
 const ATTRIBUTION_PARAMS = [
   // 通用营销归因（Urchin Tracking Module 家族及其常见扩展）
@@ -201,11 +187,8 @@ const MARKDOWN_LINK = /\[([^\]]{0,300})\]\((https?:\/\/[^)\s]+)\)/g;
 const BARE_URL = /(?<![(<\w])(https?:\/\/[^\s<>()"'，。；：！？、…“”‘’《》【】]+)/g;
 
 /**
- * 从一段 Markdown 文本里抽出链接并登记为引用。
- *
- * 先定位 `[标签](url)` 并抹除其区间，再找裸 URL；两类匹配按原文位置合并登记。
- * 早先这里用「匹配位置是否落在某个链接起始点之后 400 字符内」来近似判断，
- * 长标签或同段落多个链接都会判错；抹除区间是精确的，也不再需要魔法窗口。
+ * Mask Markdown link spans before scanning bare URLs to avoid double-counting.
+ * Register both match types in their original text order.
  */
 function collectLinks(text, refs) {
   if (!text) return;
@@ -236,8 +219,8 @@ export function buildTurns(events, opts = {}) {
   const turns = [];
   const refs = new ReferenceCollector();
   let current = null;
-  let toolIndex = new Map();   // callId → 工具记录（仅 tools 开启时填充）
-  let toolNames = new Map();   // callId → 调用名（始终填充，References 依赖它）
+  const toolIndex = new Map();   // callId → 工具记录（仅 tools 开启时填充）
+  const toolNames = new Map();   // callId → 调用名（始终填充，References 依赖它）
 
   const ensure = () => {
     if (current === null) {
@@ -257,9 +240,7 @@ export function buildTurns(events, opts = {}) {
         if (kind === 'user') {
           current = { human: text, assistant: [], reasoning: [], tools: [], injected: [], system: [], aborted: false };
           turns.push(current);
-          // toolIndex / toolNames 刻意不在这里重置。callId 全局唯一，而结果
-          // 可能晚于下一轮用户消息才写入（长时间运行的工具、审批流程）；按轮
-          // 清空会让这类结果匹配失败，在文档里多出一条"未匹配的工具结果"。
+          // Call ids are session-wide; delayed results can arrive in a later turn.
         } else if (opts.injected && text) {
           ensure().injected.push({ kind: kind ?? 'unknown', text });
         }
@@ -295,12 +276,7 @@ export function buildTurns(events, opts = {}) {
         break;
       }
       case 'tool/result': {
-        // 工具结果有两种形状，必须都认，否则老格式会静默错位：
-        //   v4      结果摊平成 text block，id 与 isError 挂在 message 上
-        //   v0–v3   外面包一层 tool-result block，id 与 isError 在那层上，
-        //           正文在它自己的 content 里
-        // 只认 v4 时，每次调用都会匹配失败，于是多出一条"未匹配的工具结果"
-        // （导出里每个工具出现两次），正文与失败标记同时丢失。
+        // v4 places ids/flags on the message; v0/v3 wrap the body in tool-result.
         const message = data.message ?? {};
         const blocks = Array.isArray(message.content) ? message.content.filter(Boolean) : [];
         const wrapped = blocks.filter((block) => block.type === 'tool-result');
@@ -324,7 +300,7 @@ export function buildTurns(events, opts = {}) {
             ensure().tools.push({ name: '(unmatched tool result)', arguments: '', result: body, isError });
           }
         }
-        // web 检索结果里的信源同样计入 References（对应规范的 SEARCH 片段语义）
+        // Search/fetch result links also contribute references.
         if (name === 'web_search' || name === 'web_fetch') collectLinks(body, refs);
         break;
       }
@@ -337,6 +313,17 @@ export function buildTurns(events, opts = {}) {
     }
   }
   return { turns, refs };
+}
+
+// ------------------------------------------------------------------ 元信息
+
+/** Latest non-empty title; a session may acquire or change its title after creation. */
+export function extractTitle(events) {
+  let title = null;
+  for (const event of events) {
+    if (event?.type === 'session/title' && event.data?.title) title = event.data.title;
+  }
+  return title;
 }
 
 /** 从 request/header 事件里取运行用的模型。 */
@@ -358,11 +345,7 @@ export function extractModel(events) {
  * @returns {{markdown: string, turnCount: number, referenceCount: number, title: string|null}}
  */
 export function renderMarkdown({ header, events }, opts = {}, meta = {}) {
-  let title = null;
-  for (const event of events) {
-    if (event?.type === 'session/title' && event.data?.title) title = event.data.title;
-  }
-
+  const title = extractTitle(events);
   const { turns, refs } = buildTurns(events, opts);
   const real = turns.filter((t) => t.human !== null);
   const { model } = extractModel(events);
@@ -473,7 +456,7 @@ export function markdownFilename(header, title) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, MAX_FILENAME_STEM)
-    // 保持原来的长度上限，但不能留下被截断的 emoji 高位代理项。
+    // Do not leave a dangling high surrogate at the filename length limit.
     .replace(/[\uD800-\uDBFF]$/, '')
     .replace(/[.\s]+$/, '')
     .trim();

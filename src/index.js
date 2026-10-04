@@ -1,20 +1,17 @@
 /**
- * 宿主半边：把「按会话 id 读日志 → 渲染 Markdown」暴露成一条同源 HTTP 路由。
- *
- * 读取走本进程直接读会话日志文件（多帧 zstd），不依赖 sessionQuery 的规范化
- * 事件形状——那是会随会话格式版本漂移的地方，也正是同类插件频繁失效的原因。
- * 本插件不声明任何 @deepseek-ai/* peer 依赖，因此不会被 0.2.x 的兼容性闸门拦下。
+ * Host HTTP route for reading session logs and exporting Markdown.
  */
 
 import { findSessionFile, readSessionLog, hasZstdSupport } from './session.js';
-import { renderMarkdown, markdownFilename, extractModel, fallbackMarkdownFilename } from './render.js';
+import {
+  renderMarkdown, markdownFilename, extractTitle, extractModel, fallbackMarkdownFilename,
+} from './render.js';
 
 export const name = 'md-export';
 export const inject = ['webServer', 'webRuntime'];
 
 /**
- * 路由路径。客户端 `lib/client.js` 里的 `ENDPOINT` 必须与之一致：浏览器模块
- * 无法 import 宿主 ESM，这个重复是结构性的，改一处就要改两处。
+ * Keep in sync with ENDPOINT in lib/client.js, which cannot import host ESM.
  */
 export const MD_EXPORT_PATH = '/api/md-export';
 /** 请求体上限：这里只接受一个会话 id 和几个布尔开关。 */
@@ -43,7 +40,7 @@ function isLoopback(hostname) {
   return parts.length === 4 && parts[0] === '127' && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255);
 }
 
-/** 复刻 DSH Web 对 /api 的 Host/Origin 信任围栏。 */
+/** Enforce the DSH Web /api Host/Origin trust policy. */
 export function isTrustedRequest(request, trustedHosts = []) {
   const host = headerValue(request.headers, 'host');
   if (host === undefined) return false;
@@ -155,12 +152,9 @@ export function createMdExportHandler({ trustedHosts = [], onError = () => {} } 
       const proto = headerValue(request.headers, 'x-forwarded-proto') ?? 'http';
       const origin = host ? `${proto}://${host}` : null;
 
-      // 轻量元信息：客户端在挂载时预取文件名，才能在用户手势内用对话标题弹出保存框
+      // The save picker needs a filename without rendering the transcript.
       if (flag(url.searchParams.get('meta') ?? body.meta)) {
-        let metaTitle = null;
-        for (const event of log.events) {
-          if (event?.type === 'session/title' && event.data?.title) metaTitle = event.data.title;
-        }
+        const metaTitle = extractTitle(log.events);
         response.writeHead(200, {
           'Cache-Control': 'no-store',
           'Content-Type': 'application/json; charset=utf-8',
@@ -201,8 +195,7 @@ export function createMdExportHandler({ trustedHosts = [], onError = () => {} } 
  * @param {object} ctx DSH Cordis 上下文。
  */
 export function apply(ctx) {
-  // 会话日志是 zstd 压缩的，而 node:zlib 的 zstd API 在 22.15 之前不存在。
-  // 在这里说清楚，好过让用户点按钮时收到一条 500。
+  // Report an unsupported runtime when the plugin loads.
   if (!hasZstdSupport()) {
     ctx.logger?.warn?.(new Error(
       `md-export: this runtime (Node ${process.version}) has no zstd support in node:zlib, `

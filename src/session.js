@@ -1,14 +1,6 @@
 /**
- * 会话日志的定位与读取。
- *
- * DSH 往会话日志里按帧追加 zstd 数据，所以一个 `.zstd` 文件往往是几百个
- * **拼接的 zstd 帧**。Node 的 `zstdDecompressSync` 只解第一帧，流式 API 遇到
- * 第二帧会报 "Unknown frame descriptor"，因此这里先检查完整帧结构，再逐帧解压。
- *
- * `node:zlib` 的 zstd API 并非所有 Node 都有（22.15 / 23.8 起才有，20 与 21 完全
- * 没有）。所以这里按命名空间导入再做运行时判断，而不是具名导入——具名导入在
- * 不支持的 Node 上会让整个模块链接失败，插件连加载都做不到，报错还是一条难懂的
- * `does not provide an export named …`。
+ * Locate and read session logs, including concatenated Zstandard frames.
+ * A namespace import allows an explicit error on runtimes without Zstandard.
  */
 
 import fs from 'node:fs';
@@ -29,12 +21,6 @@ function zstdUnavailable() {
     `this Node runtime (${process.version}) has no zstd support in node:zlib, `
     + 'and DSH session logs are zstd-compressed. Node 22.15+, 23.8+ or 24+ is required.',
   );
-}
-
-/** zstd 解压，不可用时给出可执行的报错而不是一条模块链接错误。 */
-export function zstdDecompress(buffer) {
-  if (!hasZstdSupport()) throw zstdUnavailable();
-  return zlib.zstdDecompressSync(buffer);
 }
 
 /** 一个会话目录里可能并存多代文件（session.jsonl / session.v3 / session.v4），取最高代。 */
@@ -106,8 +92,8 @@ export function findSessionFile(sessionId) {
 }
 
 /**
- * 按公开的 Zstandard 格式计算一个完整帧的末尾，不搜索负载里的 magic。
- * Node 22 / 早期 24 的解压器会接受不完整输入，不能只靠解压成功判断完整性。
+ * Find complete frame boundaries from the Zstandard layout, not payload magic.
+ * Node 22 and early 24 may accept incomplete input without a decoder error.
  * https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md
  */
 function zstdFrameEnd(buffer, start) {

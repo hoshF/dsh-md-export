@@ -1,7 +1,6 @@
 /**
- * Client save-flow tests over the shipped loader module. The small React/host
- * mock supplies hooks and observable UI props; it never touches a DSH profile,
- * browser, real session log, or output file.
+ * Client save-flow tests over the shipped loader module, with React hooks and
+ * the host slot locale contract supplied by a small mock.
  */
 
 import test from 'node:test';
@@ -25,7 +24,7 @@ async function settle() {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
-function createClient({ meta, content, picker, supportsPicker = true } = {}) {
+function createClient({ meta, content, picker, supportsPicker = true, language = 'en' } = {}) {
   const requests = [];
   const pickerCalls = [];
   const writes = [];
@@ -38,6 +37,7 @@ function createClient({ meta, content, picker, supportsPicker = true } = {}) {
   let now = 0;
   let hookIndex = 0;
   let renderAction;
+  let slotDefinition;
   let tree;
   let mounted = true;
   let renderQueued = false;
@@ -61,7 +61,7 @@ function createClient({ meta, content, picker, supportsPicker = true } = {}) {
 
   function render() {
     hookIndex = 0;
-    tree = renderAction({ sessionId: SESSION_ID });
+    tree = renderAction({ sessionId: SESSION_ID, t: ctx.locale.bind(slotDefinition.locale) });
     while (effects.length > 0) effects.shift()();
   }
 
@@ -104,12 +104,12 @@ function createClient({ meta, content, picker, supportsPicker = true } = {}) {
   const ctx = {
     locale: {
       register(namespace, dictionary) { dictionaries.set(namespace, dictionary); },
-      bind(namespace) { return (key) => dictionaries.get(namespace).en[key]; },
+      bind(namespace) { return (key) => dictionaries.get(namespace)[language][key]; },
     },
     effect(effect) { effect(); },
     slots: {
       inject(_slot, effect) { effect(); },
-      register(_definition, action) { renderAction = action; },
+      register(definition, action) { slotDefinition = definition; renderAction = action; },
     },
   };
   const window = {
@@ -176,11 +176,16 @@ function createClient({ meta, content, picker, supportsPicker = true } = {}) {
 
   return {
     requests, pickerCalls, writes, downloads,
+    get slotDefinition() { return slotDefinition; },
     get button() { return tree.props.children[0].props; },
     get toast() { return tree.props.children[1]?.props ?? null; },
     get closes() { return closes; },
     get aborts() { return aborts; },
     get updatesAfterUnmount() { return updatesAfterUnmount; },
+    setLanguage(value) {
+      language = value;
+      if (mounted) render();
+    },
     async advance(ms) {
       const end = now + ms;
       while (true) {
@@ -202,6 +207,59 @@ function createClient({ meta, content, picker, supportsPicker = true } = {}) {
     },
   };
 }
+
+test('slot locale injection updates English and Chinese labels and hints without remounting', async () => {
+  const client = createClient();
+  await settle();
+  assert.equal(client.slotDefinition.locale, 'dsh-md-export');
+  assert.equal(client.slotDefinition.label, 'Export MD');
+  assert.equal(client.button.children[1], 'Export MD');
+  assert.equal(client.button.children[2].props.children[0],
+    'Export this conversation as Markdown (opens the system save dialog)');
+
+  client.setLanguage('zh');
+  assert.equal(client.button.children[1], '导出 MD');
+  assert.equal(client.button.children[2].props.children[0], '把当前会话导出为 Markdown（弹出系统保存窗口）');
+  client.setLanguage('en');
+  assert.equal(client.button.children[1], 'Export MD');
+  assert.equal(client.button.children[2].props.children[0],
+    'Export this conversation as Markdown (opens the system save dialog)');
+  await settle();
+  assert.equal(client.requests.length, 1, 'a language update reran the mount-time metadata request');
+  assert.equal(client.pickerCalls.length, 0);
+});
+
+test('language changes preserve the pending save and its duplicate-click lock', async () => {
+  const pending = deferred();
+  const client = createClient({ content: () => pending.promise });
+  await settle();
+  const save = client.button.onClick();
+  await settle();
+  assert.equal(client.button.children[1], 'Exporting…');
+  assert.equal(client.button.disabled, true);
+
+  client.setLanguage('zh');
+  assert.equal(client.button.children[1], '导出中…');
+  assert.equal(client.button.disabled, true);
+  await client.button.onClick();
+  client.setLanguage('en');
+  assert.equal(client.button.children[1], 'Exporting…');
+  assert.equal(client.button.disabled, true);
+  await client.button.onClick();
+  assert.equal(client.pickerCalls.length, 1);
+  assert.equal(client.requests.length, 3, 'a language update restarted metadata or content loading');
+
+  pending.resolve(MARKDOWN);
+  await save;
+  await settle();
+  assert.equal(client.writes.length, 1);
+  assert.equal(client.closes, 1);
+  assert.equal(client.button.children[1], 'Saved');
+  assert.equal(client.button.disabled, false);
+  assert.equal(client.toast.text, 'Saved Chosen by user.md');
+  client.setLanguage('zh');
+  assert.equal(client.button.children[1], '已保存');
+});
 
 test('save uses fresh metadata, fetches content after the picker, and reports the chosen name', async () => {
   let metadataReads = 0;
