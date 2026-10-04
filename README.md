@@ -308,7 +308,10 @@ retain their punctuation. Mixed bare and Markdown links share the same appearanc
 | Platforms | The core uses Node builtins; `install.sh` requires POSIX `sh`. |
 
 Formats v1 and v2 are unverified. The plugin reads an internal DSH format;
-[`docs/FORMAT.md`](docs/FORMAT.md) records the expected shapes and failure policy.
+[`docs/FORMAT.md`](docs/FORMAT.md) records the expected shapes, what they were
+verified against, and the failure policy. Reading logs instead of the sanctioned
+`ctx.sessionQuery` seam is a deliberate trade, written down in
+[Architecture](docs/ARCHITECTURE.md#why-logs-are-read-directly).
 
 ## How it works
 

@@ -4,6 +4,31 @@ This plugin reads DSH session logs from disk. The storage format is an internal
 DSH interface; the shapes below have been verified with v0, v3 and v4 logs.
 v1 and v2 have not been independently verified.
 
+## What this contract is verified against
+
+These shapes are not transcribed from published documentation — DSH does not publish
+one. They were derived by reading real logs and are held in place by the test suite.
+
+The load-bearing observation is that the two tool-result shapes **never mix**: in the
+session store this was developed against, every v0 and v3 result was wrapped and every
+v4 result was flat. A reader that knows only one shape therefore exports half of a real
+store with each tool listed twice and its output missing, and raises nothing. That is
+why both are specified below, rather than one being treated as current and the other as
+legacy.
+
+The counts are a snapshot, not a fixture: the store grows whenever DSH is used, so read
+them as scale.
+
+| format | logs | `tool/result` rows | wrapped | flat |
+|---|---:|---:|---:|---:|
+| v0 | 52 | 4,516 | 4,516 | 0 |
+| v3 | 4 | 36 | 36 | 0 |
+| v4 | 36 | 5,400+ | 0 | 5,400+ |
+
+`test/fixtures.mjs` reproduces both shapes so they stay covered without shipping
+anyone's session data. Formats v1 and v2 appear in none of these logs; they are listed
+as unverified rather than assumed to resemble their neighbours.
+
 ## Location and generation selection
 
 ```text

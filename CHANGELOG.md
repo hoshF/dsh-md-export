@@ -33,6 +33,17 @@ Changes to the rendered Markdown structure require at least a minor bump.
   and preservation of other profile plugins.
 - Verify both README output modes and the rendered default excerpt against the
   shared renderer.
+- Record what the format contract was verified against, and restore the rationale
+  for reading logs directly instead of through `ctx.sessionQuery`. That trade — no
+  compatibility gate, but owning the format — is the reason this package declares
+  no `@deepseek-ai/*` peers, and it was undocumented after the previous
+  documentation pass.
+
+  The counts in that section are labelled a snapshot rather than a fixture: the
+  session store grows whenever DSH is used, so the numbers were already stale by
+  the time they were written. What the contract actually depends on is the
+  invariant they illustrate — the two tool-result shapes never mix within a
+  format — and that is what the section leads with.
 
 ## [1.7.2] - 2026-10-03
 

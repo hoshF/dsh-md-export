@@ -66,6 +66,25 @@ The CLI imports these two modules directly. It does not make HTTP requests and
 does not need DSH running. Its metadata URL comes from `DSH_WEB_URL`; the host
 uses the current request's origin.
 
+## Why logs are read directly
+
+DSH exposes `ctx.sessionQuery`, the sanctioned seam, and maintains it across format
+versions. Reading files instead removes that safety net entirely — the trade is
+explicit, and this project picked the side that has to own the format.
+
+- **Through the seam** the harness owns the format, but the plugin joins DSH's
+  release train. Declaring official peers is what makes a plugin subject to the
+  compatibility gate, and a peer range without a prerelease branch on the installed
+  tuple silently excludes every prerelease build: `*` alone does not satisfy
+  `0.2.0-rc.2`. That is the failure mode that stops the sibling export plugins on a
+  current harness, and the reason this package declares no `@deepseek-ai/*` peers.
+- **Reading files** means no gate to satisfy and no dependency on the seam being
+  present or unchanged, at the cost of following storage changes by hand.
+
+Both are defensible. The cost of the second is written down rather than hidden:
+it is why [FORMAT.md](FORMAT.md) and `test/fixtures.mjs` exist at all, and why the
+verified format range is stated explicitly instead of assumed.
+
 ## Browser export lifecycle
 
 The click handler follows this order:

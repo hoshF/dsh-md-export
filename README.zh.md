@@ -278,7 +278,7 @@ POST /api/md-export   {"sessionId":"…","tools":true,…}
 | 宿主 | 桌面 App 与 `web` profile。路由就是普通的 `ctx.webServer` 注册。 |
 | 平台 | 核心使用 Node 内置模块；`install.sh` 需要 POSIX `sh`。 |
 
-格式 v1 与 v2 未验证。本插件读取 DSH 内部格式；[`docs/FORMAT.md`](docs/FORMAT.md) 记录预期的事件形状与失败政策。
+格式 v1 与 v2 未验证。本插件读取 DSH 内部格式；[`docs/FORMAT.md`](docs/FORMAT.md) 记录预期的事件形状、这些形状的验证依据，以及失败政策。直接读日志而不用官方 `ctx.sessionQuery` 接缝是一笔刻意的权衡，写在[架构指南](docs/ARCHITECTURE.md#why-logs-are-read-directly)里。
 
 ## 实现要点
 
